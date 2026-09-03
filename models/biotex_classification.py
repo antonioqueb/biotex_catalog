@@ -292,7 +292,7 @@ class BiotexClassificationSession(models.Model):
         if not effective('uom_id', line.uom_id.id):
             raise UserError('La unidad de medida es obligatoria.')
         qty = effective('package_qty', line.package_qty)
-        if qty not in (None, False, '') and float(qty) <= 0:
+        if qty is not None and qty != '' and float(qty) <= 0:
             raise UserError('La cantidad de presentación debe ser un número positivo.')
         barcode = (clean.get('barcode') or '').strip()
         if barcode:
