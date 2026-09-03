@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="biotex_catalog.Classifier">
+        <div class="o_biotex_classifier d-flex flex-column h-100">
+            <!-- barra superior -->
+            <div class="o_biotex_topbar d-flex align-items-center gap-3 px-4 py-2 border-bottom bg-view">
+                <h4 class="mb-0"><i class="fa fa-magic me-2 text-primary"/>Asistente de clasificación</h4>
+                <div class="flex-grow-1">
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-success" t-attf-style="width: {{progress}}%"/>
+                    </div>
+                    <small class="text-muted"><t t-esc="state.done"/> de <t t-esc="state.queue.length"/> clasificados en esta sesión</small>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-secondary" t-on-click="previous" t-att-disabled="state.queueIndex === 0"><i class="fa fa-chevron-left"/></button>
+                    <button class="btn btn-sm btn-secondary" t-on-click="skip" t-att-disabled="state.queueIndex >= state.queue.length - 1">Saltar <i class="fa fa-chevron-right"/></button>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" t-on-click="newProduct"><i class="fa fa-plus"/> Nuevo producto</button>
+            </div>
+
+            <div t-if="!state.queue.length" class="p-5 text-center text-muted">
+                <i class="fa fa-check-circle fa-3x text-success mb-3"/>
+                <h4>No hay productos pendientes de clasificar.</h4>
+            </div>
+
+            <div t-else="" class="d-flex flex-grow-1 overflow-hidden">
+                <!-- pasos -->
+                <div class="o_biotex_steps border-end p-3" style="width: 240px; min-width: 240px;">
+                    <div class="mb-3 p-2 rounded bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <img t-if="state.product.image_128" t-att-src="'data:image/png;base64,' + state.product.image_128" class="rounded" style="width:48px;height:48px;object-fit:cover"/>
+                            <div class="text-truncate">
+                                <div class="fw-bold text-truncate" t-att-title="current.name"><t t-esc="current.name"/></div>
+                                <small class="text-muted"><t t-esc="current.default_code || 'Sin clave'"/></small>
+                            </div>
+                        </div>
+                        <small t-if="current.biotex_missing" class="text-danger d-block mt-1">Faltan: <t t-esc="current.biotex_missing"/></small>
+                        <a t-if="current.id" href="#" class="small" t-on-click.prevent="openForm">Abrir ficha completa</a>
+                    </div>
+                    <t t-foreach="steps" t-as="s" t-key="s.key">
+                        <div class="o_biotex_step d-flex align-items-center gap-2 py-2 px-2 rounded mb-1"
+                             t-att-class="{ 'bg-primary text-white': s_index === state.step, 'text-muted': !canGo(s_index), 'cursor-pointer': canGo(s_index) }"
+                             t-on-click="() => this.goTo(s_index)">
+                            <span class="badge rounded-circle" t-att-class="stepValid(s_index) and s_index !== state.step ? 'text-bg-success' : 'text-bg-secondary'"><t t-esc="s_index + 1"/></span>
+                            <span><t t-esc="s.label"/></span>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- contenido del paso -->
+                <div class="flex-grow-1 p-4 overflow-auto">
+
+                    <t t-if="stepKey === 'group'">
+                        <h5>¿A qué grupo pertenece?</h5>
+                        <p class="text-muted">Piense en la naturaleza del artículo, no en dónde se usa.</p>
+                        <div class="row g-3">
+                            <t t-foreach="state.tree" t-as="g" t-key="g.id">
+                                <div class="col-6 col-md-4 col-xl-3">
+                                    <div class="card h-100 o_biotex_card" t-att-class="{ 'border-primary shadow': g.id === state.product.biotex_group_id }" t-on-click="() => this.selectGroup(g)" role="button">
+                                        <div class="card-body">
+                                            <span class="badge text-bg-dark mb-2"><t t-esc="g.code"/></span>
+                                            <h6 class="card-title mb-1"><t t-esc="g.name"/></h6>
+                                            <small class="text-muted"><t t-esc="g.families.length"/> familias</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
+                    <t t-if="stepKey === 'family'">
+                        <h5>Familia dentro de <span class="text-primary"><t t-esc="group and group.name"/></span></h5>
+                        <input type="text" class="form-control mb-3" placeholder="Buscar familia..." t-att-value="state.familySearch" t-on-input="(ev) => state.familySearch = ev.target.value" autofocus="autofocus"/>
+                        <div class="row g-2">
+                            <t t-foreach="families" t-as="f" t-key="f.id">
+                                <div class="col-6 col-md-4 col-xl-3">
+                                    <div class="card o_biotex_card h-100" t-att-class="{ 'border-primary shadow': f.id === state.product.biotex_family_id }" t-on-click="() => this.selectFamily(f)" role="button">
+                                        <div class="card-body py-2">
+                                            <div class="d-flex justify-content-between">
+                                                <span class="badge text-bg-secondary"><t t-esc="f.code"/></span>
+                                                <span t-if="f.pending" class="badge text-bg-warning" t-att-title="f.pending + ' pendientes'"><t t-esc="f.pending"/></span>
+                                            </div>
+                                            <div class="fw-bold mt-1"><t t-esc="f.name"/></div>
+                                            <small t-if="f.hint" class="text-muted d-block text-truncate" t-att-title="f.hint"><t t-esc="f.hint"/></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                        <p t-if="!families.length" class="text-muted mt-3">No hay familias en este grupo. Solo Dirección puede crearlas.</p>
+                    </t>
+
+                    <t t-if="stepKey === 'description'">
+                        <h5>Descripción estructurada</h5>
+                        <p class="text-muted">Siempre en el mismo orden: <b>nombre</b> + <b>medida</b> + <b>contenido</b>. Sin marca, sin datos innecesarios.</p>
+                        <div t-if="family and family.hint" class="alert alert-info py-2"><i class="fa fa-lightbulb-o me-1"/><t t-esc="family.hint"/></div>
+                        <div class="row g-3" style="max-width: 900px;">
+                            <div class="col-md-6"><label class="form-label fw-bold">Nombre base *</label>
+                                <input class="form-control" t-att-value="state.product.biotex_name" t-on-input="(ev) => this.onInput('biotex_name', ev)" placeholder="Aguja hipodérmica"/></div>
+                            <div class="col-md-3"><label class="form-label fw-bold">Medida / calibre *</label>
+                                <input class="form-control" t-att-value="state.product.biotex_measure" t-on-input="(ev) => this.onInput('biotex_measure', ev)" placeholder="21G x 32mm"/></div>
+                            <div class="col-md-3"><label class="form-label">Contenido</label>
+                                <input class="form-control" t-att-value="state.product.biotex_content" t-on-input="(ev) => this.onInput('biotex_content', ev)" placeholder="Caja c/100"/></div>
+                            <div class="col-md-6"><label class="form-label">Notas de uso</label>
+                                <input class="form-control" t-att-value="state.product.biotex_usage_notes" t-on-input="(ev) => this.onInput('biotex_usage_notes', ev)" placeholder="pediátrico, universal, estéril..."/></div>
+                        </div>
+                        <div class="mt-4 p-3 rounded bg-light">
+                            <small class="text-muted d-block">Así quedará el nombre del producto:</small>
+                            <span class="fs-5 fw-bold"><t t-esc="previewName || '—'"/></span>
+                        </div>
+                        <div t-if="state.product.description" class="mt-3"><small class="text-muted">Descripción original capturada:</small><div class="small border rounded p-2"><t t-esc="state.product.description"/></div></div>
+                    </t>
+
+                    <t t-if="stepKey === 'brand'">
+                        <h5>Marca, modelo y compatibilidad</h5>
+                        <div class="row g-4" style="max-width: 1000px;">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Marca *</label>
+                                <div t-if="state.product.biotex_brand_id" class="mb-2">
+                                    <span class="badge text-bg-primary fs-6"><t t-esc="brandName"/></span>
+                                    <button class="btn btn-link btn-sm" t-on-click="() => { state.product.biotex_brand_id = false; }">cambiar</button>
+                                </div>
+                                <input class="form-control" placeholder="Escriba para buscar o crear..." t-att-value="state.brandSearch" t-on-input="onBrandSearch"/>
+                                <div class="list-group mt-1" t-if="state.brandSearch">
+                                    <button t-foreach="filteredBrands" t-as="b" t-key="b.id" class="list-group-item list-group-item-action py-1" t-on-click="() => this.selectBrand(b)"><t t-esc="b.name"/></button>
+                                    <button t-if="!filteredBrands.some(b => b.name.toLowerCase() === state.brandSearch.toLowerCase())" class="list-group-item list-group-item-action py-1 text-primary" t-on-click="createBrand">
+                                        <i class="fa fa-plus me-1"/>Crear marca "<t t-esc="state.brandSearch"/>"
+                                    </button>
+                                </div>
+                                <div t-if="state.brandSimilar.length" class="alert alert-warning py-1 mt-2 small">
+                                    <i class="fa fa-exclamation-triangle me-1"/>Posibles duplicados:
+                                    <t t-foreach="state.brandSimilar" t-as="b" t-key="b.id"><a href="#" class="ms-1" t-on-click.prevent="() => this.selectBrand(b)"><t t-esc="b.name"/></a></t>
+                                </div>
+                                <label class="form-label fw-bold mt-3">Modelo</label>
+                                <input class="form-control" t-att-value="state.product.biotex_model" t-on-input="(ev) => this.onInput('biotex_model', ev)"/>
+                                <label class="form-label fw-bold mt-3">Referencia del fabricante</label>
+                                <input class="form-control" t-att-value="state.product.biotex_reference" t-on-input="(ev) => this.onInput('biotex_reference', ev)" placeholder="Identificador único; si no existe, se asigna código propio"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Fabricante</label>
+                                <div t-if="state.manufacturerName" class="mb-1"><span class="badge text-bg-secondary"><t t-esc="state.manufacturerName"/></span></div>
+                                <input class="form-control" placeholder="Buscar fabricante..." t-on-input="onManufacturerSearch"/>
+                                <div class="list-group mt-1">
+                                    <button t-foreach="state.manufacturers" t-as="m" t-key="m.id" class="list-group-item list-group-item-action py-1" t-on-click="() => this.selectManufacturer(m)"><t t-esc="m.name"/></button>
+                                </div>
+                                <label class="form-label fw-bold mt-3">Equipos compatibles <small class="text-muted fw-normal">(cables, sensores, circuitos)</small></label>
+                                <div class="mb-1">
+                                    <t t-foreach="state.product.biotex_equipment_ids" t-as="eid" t-key="eid">
+                                        <span class="badge text-bg-info me-1"><t t-esc="equipmentLabel(eid)"/> <i class="fa fa-times ms-1" role="button" t-on-click="() => this.toggleEquipment({id: eid, display_name: equipmentLabel(eid)})"/></span>
+                                    </t>
+                                </div>
+                                <input class="form-control" placeholder="Buscar marca / modelo de equipo..." t-att-value="state.equipmentSearch" t-on-input="onEquipmentSearch"/>
+                                <div class="list-group mt-1">
+                                    <button t-foreach="state.equipments" t-as="eq" t-key="eq.id" class="list-group-item list-group-item-action py-1" t-on-click="() => this.toggleEquipment(eq)">
+                                        <i t-att-class="'fa me-1 ' + (state.product.biotex_equipment_ids.includes(eq.id) ? 'fa-check-square-o' : 'fa-square-o')"/><t t-esc="eq.display_name"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <t t-if="stepKey === 'photos'">
+                        <h5>Fotos (hasta 3)</h5>
+                        <p class="text-muted">Un producto no está <b>completo</b> sin foto. Para cables, incluya la foto de las conexiones.</p>
+                        <div t-if="state.product.existingPhotos" class="alert alert-success py-1">Este producto ya tiene <t t-esc="state.product.existingPhotos"/> foto(s) guardada(s).</div>
+                        <div class="row g-3">
+                            <t t-foreach="photoSlots" t-as="slot" t-key="slot">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 text-center h-100">
+                                        <img t-if="state.product[slot]" t-att-src="'data:image/png;base64,' + state.product[slot]" class="img-fluid rounded mb-2" style="max-height: 220px;"/>
+                                        <div t-else="" class="text-muted py-5"><i class="fa fa-camera fa-3x"/><div>Foto <t t-esc="slot_index + 1"/></div></div>
+                                        <input type="file" accept="image/*" capture="environment" class="form-control form-control-sm" t-on-change="(ev) => this.onPhoto(slot, ev)"/>
+                                        <button t-if="state.product[slot]" class="btn btn-link btn-sm text-danger" t-on-click="() => this.clearPhoto(slot)">Quitar</button>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
+                    <t t-if="stepKey === 'review'">
+                        <h5>Revisión</h5>
+                        <table class="table table-sm" style="max-width: 800px;">
+                            <tr><th style="width:220px">Grupo / familia</th><td><t t-esc="group and group.name"/> → <b><t t-esc="family and family.name"/></b></td></tr>
+                            <tr><th>Nombre final</th><td class="fw-bold"><t t-esc="previewName"/></td></tr>
+                            <tr><th>Marca / modelo</th><td><t t-esc="brandName"/> <t t-esc="state.product.biotex_model"/></td></tr>
+                            <tr><th>Referencia</th><td><t t-esc="state.product.biotex_reference || 'Sin referencia → se asigna código propio (QR)'"/></td></tr>
+                            <tr><th>Equipos compatibles</th><td><t t-esc="state.product.biotex_equipment_ids.length"/></td></tr>
+                            <tr><th>Fotos</th><td><span t-att-class="photoCount ? 'text-success' : 'text-warning'"><t t-esc="photoCount"/> foto(s)</span></td></tr>
+                            <tr><th>Clave</th><td><t t-esc="current.default_code || 'Se asignará automáticamente al guardar'"/></td></tr>
+                        </table>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-lg" t-on-click="() => this.save(true)" t-att-disabled="state.saving"><i class="fa fa-save me-1"/>Guardar y siguiente</button>
+                            <button class="btn btn-outline-primary btn-lg" t-on-click="() => this.save(false)" t-att-disabled="state.saving">Guardar</button>
+                        </div>
+                    </t>
+
+                    <!-- navegación -->
+                    <div class="d-flex justify-content-between mt-4 pt-3 border-top" t-if="stepKey !== 'review'">
+                        <button class="btn btn-secondary" t-on-click="back" t-att-disabled="state.step === 0"><i class="fa fa-arrow-left me-1"/>Atrás</button>
+                        <button class="btn btn-primary" t-on-click="next">Siguiente <i class="fa fa-arrow-right ms-1"/></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_catalog_classifier" model="res.groups">
+        <field name="name">Clasificador de catálogo</field>
+        <field name="privilege_id" ref="biotex_base.privilege_biotex"/>
+        <field name="implied_ids" eval="[(4, ref('biotex_base.group_biotex_delegation'))]"/>
+        <field name="comment">Personal capacitado (con examen) que clasifica productos con el asistente.</field>
+    </record>
+    <record id="base.user_admin" model="res.users">
+        <field name="group_ids" eval="[(4, ref('biotex_base.group_biotex_direction')), (4, ref('group_catalog_classifier'))]"/>
+    </record>
+</odoo>

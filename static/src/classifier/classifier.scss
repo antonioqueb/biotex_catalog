@@ -1,0 +1,6 @@
+.o_biotex_classifier {
+    .o_biotex_card { cursor: pointer; transition: transform .08s ease, box-shadow .08s ease; }
+    .o_biotex_card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .o_biotex_step.cursor-pointer { cursor: pointer; }
+    .o_biotex_step:not(.bg-primary):hover { background: var(--bs-light); }
+}

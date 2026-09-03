@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_biotex_equipment_list" model="ir.ui.view">
+        <field name="name">biotex.equipment.list</field>
+        <field name="model">biotex.equipment</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="brand_id"/>
+                <field name="model"/>
+                <field name="equipment_type"/>
+                <field name="product_ids" widget="many2many_tags" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_biotex_equipment_form" model="ir.ui.view">
+        <field name="name">biotex.equipment.form</field>
+        <field name="model">biotex.equipment</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <field name="image" widget="image" class="oe_avatar"/>
+                    <group>
+                        <group>
+                            <field name="brand_id"/>
+                            <field name="model"/>
+                            <field name="equipment_type"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Insumos compatibles">
+                            <field name="product_ids">
+                                <list>
+                                    <field name="default_code"/>
+                                    <field name="name"/>
+                                    <field name="biotex_brand_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notas"><field name="notes"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_biotex_equipment" model="ir.actions.act_window">
+        <field name="name">Equipos compatibles</field>
+        <field name="res_model">biotex.equipment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

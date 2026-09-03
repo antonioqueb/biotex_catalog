@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_label_qr" model="report.paperformat">
+        <field name="name">Etiqueta QR 60x40</field>
+        <field name="format">custom</field>
+        <field name="page_height">40</field>
+        <field name="page_width">60</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">2</field>
+        <field name="margin_bottom">2</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+    </record>
+
+    <record id="action_report_product_label_qr" model="ir.actions.report">
+        <field name="name">Etiqueta QR</field>
+        <field name="model">product.template</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">biotex_catalog.report_product_label_qr</field>
+        <field name="report_file">biotex_catalog.report_product_label_qr</field>
+        <field name="paperformat_id" ref="paperformat_label_qr"/>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_product_label_qr">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="o">
+                <div style="width:56mm;height:36mm;page-break-after:always;font-family:sans-serif;display:flex;align-items:center;">
+                    <div style="width:22mm;">
+                        <img t-att-src="'/report/barcode/?barcode_type=QR&amp;value=%s&amp;width=90&amp;height=90' % (o.barcode or o.default_code or '')"
+                             style="width:22mm;height:22mm;"/>
+                    </div>
+                    <div style="flex:1;padding-left:2mm;font-size:8px;line-height:1.15;">
+                        <div style="font-size:11px;font-weight:bold;"><t t-esc="o.default_code"/></div>
+                        <div><t t-esc="o.name"/></div>
+                        <div t-if="o.biotex_brand_id"><b>Marca:</b> <t t-esc="o.biotex_brand_id.name"/> <t t-esc="o.biotex_model or ''"/></div>
+                        <div t-if="o.biotex_reference"><b>Ref:</b> <t t-esc="o.biotex_reference"/></div>
+                        <div t-if="o.biotex_usage_notes" style="color:#555;"><t t-esc="o.biotex_usage_notes"/></div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

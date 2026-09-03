@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_biotex_classifier" model="ir.actions.client">
+        <field name="name">Asistente de clasificación</field>
+        <field name="tag">biotex_catalog.classifier</field>
+    </record>
+</odoo>

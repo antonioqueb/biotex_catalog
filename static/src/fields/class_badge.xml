@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="biotex_catalog.ClassBadge">
+        <span class="badge rounded-pill fs-6 fw-normal" t-att-class="meta.cls" t-att-title="missing ? 'Faltan: ' + missing : ''">
+            <i t-att-class="'fa me-1 ' + meta.icon"/><t t-esc="meta.label"/>
+            <t t-if="missing"><small class="ms-1 opacity-75">(<t t-esc="missing"/>)</small></t>
+        </span>
+    </t>
+</templates>
