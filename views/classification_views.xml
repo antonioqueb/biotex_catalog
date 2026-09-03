@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Pantalla de trabajo (OWL) -->
+    <record id="action_biotex_classification_workspace" model="ir.actions.client">
+        <field name="name">Asistente de clasificación</field>
+        <field name="tag">biotex_catalog.classification_workspace</field>
+    </record>
+
+    <!-- Sesiones: lista y ficha de consulta / auditoría -->
+    <record id="view_biotex_classification_session_list" model="ir.ui.view">
+        <field name="name">biotex.classification.session.list</field>
+        <field name="model">biotex.classification.session</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancelled'" decoration-success="state == 'confirmed'">
+                <field name="date"/>
+                <field name="class_code"/>
+                <field name="group_id" optional="hide"/>
+                <field name="family_id" optional="hide"/>
+                <field name="classifier_id" optional="hide"/>
+                <field name="brand_id"/>
+                <field name="line_count" string="Productos"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'confirmed'"/>
+                <button name="action_open_workspace" type="object" string="Abrir asistente" icon="fa-external-link"
+                        invisible="state != 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_biotex_classification_session_form" model="ir.ui.view">
+        <field name="name">biotex.classification.session.form</field>
+        <field name="model">biotex.classification.session</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_open_workspace" type="object" string="Abrir asistente" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_confirm" type="object" string="Generar claves" class="btn-primary"
+                            invisible="state != 'draft' or line_count == 0"
+                            confirm="Se escribirá la clave definitiva en cada producto de la lista. ¿Continuar?"/>
+                    <button name="action_cancel" type="object" string="Cancelar sesión" invisible="state != 'draft'"/>
+                    <button name="action_draft" type="object" string="Volver a borrador" invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_products" type="object" class="oe_stat_button" icon="fa-cubes">
+                            <field name="line_count" widget="statinfo" string="Productos"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="class_code" readonly="1" placeholder="Sin clasificación"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="group_id" readonly="state != 'draft'"/>
+                            <field name="family_id" readonly="state != 'draft'"/>
+                            <field name="allowed_classifier_ids" invisible="1"/>
+                            <field name="classifier_id" readonly="state != 'draft'"/>
+                            <field name="brand_id" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="user_id"/>
+                            <field name="date"/>
+                            <field name="complete"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Productos" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id" readonly="1"/>
+                                    <field name="new_name"/>
+                                    <field name="old_name" readonly="1"/>
+                                    <field name="uom_id"/>
+                                    <field name="reference" readonly="1"/>
+                                    <field name="consecutive" readonly="1"/>
+                                    <field name="state" readonly="1" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_biotex_classification_session_search" model="ir.ui.view">
+        <field name="name">biotex.classification.session.search</field>
+        <field name="model">biotex.classification.session</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="class_code"/>
+                <field name="brand_id"/>
+                <field name="user_id"/>
+                <filter name="my" string="Mis sesiones" domain="[('user_id', '=', uid)]"/>
+                <separator/>
+                <filter name="draft" string="Borrador" domain="[('state', '=', 'draft')]"/>
+                <filter name="confirmed" string="Confirmadas" domain="[('state', '=', 'confirmed')]"/>
+                <group>
+                    <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
+                    <filter name="group_user" string="Responsable" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_code" string="Clasificación" context="{'group_by': 'class_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_biotex_classification_sessions" model="ir.actions.act_window">
+        <field name="name">Sesiones de clasificación</field>
+        <field name="res_model">biotex.classification.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_my': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no hay sesiones de clasificación.</p>
+            <p>Abra el asistente de clasificación para crear una: se guarda sola en cuanto elige la clasificación.</p>
+        </field>
+    </record>
+</odoo>

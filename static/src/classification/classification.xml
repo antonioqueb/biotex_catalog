@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="biotex_catalog.ClassificationWorkspace">
+    <div class="o_action o_bcw">
+
+        <!-- ================================================== encabezado -->
+        <header class="o_bcw_top">
+            <div class="o_bcw_top_titles">
+                <h1>Asistente de clasificación</h1>
+                <p>Clasifica productos de forma rápida y ordenada</p>
+            </div>
+            <div class="o_bcw_top_actions">
+                <span t-if="state.busy" class="o_bcw_busy"><i class="fa fa-circle-o-notch fa-spin"/></span>
+                <button class="btn btn-sm btn-link o_bcw_link" t-on-click="cancel">Cancelar</button>
+                <button class="btn btn-sm btn-primary" t-on-click="saveAndExit">Guardar y salir</button>
+            </div>
+        </header>
+
+        <div t-if="state.loading" class="o_bcw_loading"><i class="fa fa-circle-o-notch fa-spin fa-2x"/></div>
+
+        <div t-else="" class="o_bcw_body">
+
+            <!-- borradores pendientes: "Guardar y salir" tiene sentido solo si se puede retomar -->
+            <div t-if="state.drafts.length and !state.session" class="o_bcw_drafts">
+                <i class="fa fa-history"/>
+                <span>Tienes sesiones sin terminar:</span>
+                <t t-foreach="state.drafts" t-as="draft" t-key="draft.id">
+                    <button class="o_bcw_draft_chip" t-on-click="() => this.openDraft(draft.id)">
+                        <t t-esc="draft.class_code or 'Sin clasificación'"/>
+                        <span class="o_bcw_draft_count"><t t-esc="draft.line_count"/></span>
+                    </button>
+                </t>
+            </div>
+
+            <!-- ============================================== etapa 1 -->
+            <section class="o_bcw_stage" t-att-class="{o_bcw_stage_active: state.stage === 1}">
+                <header class="o_bcw_stage_head" t-on-click="() => this.goStage(1)">
+                    <span class="o_bcw_num o_bcw_tone_group">1</span>
+                    <div class="o_bcw_stage_titles">
+                        <h2>Selecciona clasificación</h2>
+                        <p>Grupo, familia, clasificador y marca. Cada nivel limita el siguiente.</p>
+                    </div>
+                    <div class="o_bcw_stage_mini" t-if="state.collapsed[1] and classificationComplete">
+                        <span class="o_bcw_code o_bcw_code_sm">
+                            <t t-foreach="codeSegments" t-as="seg" t-key="seg_index">
+                                <span t-attf-class="o_bcw_seg o_bcw_tone_{{seg.tone}}" t-esc="seg.text"/>
+                                <span t-if="!seg_last" class="o_bcw_dash">-</span>
+                            </t>
+                        </span>
+                        <span class="o_bcw_chip o_bcw_chip_ok"><i class="fa fa-check"/> Completa</span>
+                    </div>
+                    <button class="o_bcw_collapse" t-att-class="{o_bcw_collapse_open: !state.collapsed[1]}"
+                            t-on-click.stop="() => this.toggleCollapse(1)"
+                            t-att-title="state.collapsed[1] ? 'Desplegar etapa 1' : 'Colapsar etapa 1'">
+                        <i class="fa fa-angle-left"/>
+                    </button>
+                </header>
+
+                <div class="o_bcw_stage_body" t-if="!state.collapsed[1]">
+                    <div class="o_bcw_levels">
+                        <t t-foreach="levels" t-as="level" t-key="level.key">
+                            <t t-set="sel" t-value="selection(level.key)"/>
+                            <button class="o_bcw_pick"
+                                    t-attf-class="o_bcw_tone_{{level.tone}} {{ sel ? 'o_bcw_picked' : '' }} {{ state.openPicker === level.key ? 'o_bcw_open' : '' }}"
+                                    t-att-disabled="!levelEnabled(level.key) or confirmed"
+                                    t-on-click="() => this.togglePicker(level.key)">
+                                <span class="o_bcw_pick_icon"><i t-attf-class="fa {{level.icon}}"/></span>
+                                <span class="o_bcw_pick_body">
+                                    <span class="o_bcw_pick_label"><t t-esc="level.label"/></span>
+                                    <span t-if="sel" class="o_bcw_pick_code"><t t-esc="sel.code"/></span>
+                                    <span t-if="sel" class="o_bcw_pick_name" t-att-title="sel.name"><t t-esc="sel.name"/></span>
+                                    <span t-if="sel and sel.note" class="o_bcw_pick_note" t-esc="sel.note"/>
+                                    <span t-if="!sel" class="o_bcw_pick_empty">
+                                        <t t-if="levelEnabled(level.key)">Sin seleccionar</t>
+                                        <t t-else="">Elige antes <t t-esc="previousLabel(level.key)"/></t>
+                                    </span>
+                                </span>
+                                <span class="o_bcw_pick_state"><i t-if="sel" class="fa fa-check-circle"/></span>
+                                <span class="o_bcw_pick_toggle"><i class="fa fa-angle-left"/></span>
+                            </button>
+                        </t>
+                    </div>
+
+                    <!-- panel de opciones del nivel abierto -->
+                    <div t-if="state.openPicker" class="o_bcw_picker" t-attf-class="o_bcw_tone_{{openLevel.tone}}">
+                        <div class="o_bcw_picker_head">
+                            <strong>Elige <t t-esc="openLevel.label.toLowerCase()"/></strong>
+                            <input type="text" class="o_bcw_input" placeholder="Filtrar por código o nombre..."
+                                   t-att-value="state.pickerSearch" t-on-input="onPickerSearch" autofocus="autofocus"/>
+                            <button class="o_bcw_icon_btn" t-on-click="() => this.togglePicker(state.openPicker)" title="Cerrar"><i class="fa fa-times"/></button>
+                        </div>
+                        <div class="o_bcw_picker_list">
+                            <t t-set="opts" t-value="options(state.openPicker)"/>
+                            <button t-foreach="opts" t-as="opt" t-key="opt.id" class="o_bcw_opt"
+                                    t-att-class="{o_bcw_opt_active: state.pick[state.openPicker] === opt.id}"
+                                    t-on-click="() => this.select(state.openPicker, opt)">
+                                <span class="o_bcw_opt_code"><t t-esc="opt.code"/></span>
+                                <span class="o_bcw_opt_name"><t t-esc="opt.name"/></span>
+                                <span t-if="opt.note" class="o_bcw_opt_note"><t t-esc="opt.note"/></span>
+                                <i t-if="state.pick[state.openPicker] === opt.id" class="fa fa-check o_bcw_opt_check"/>
+                            </button>
+                            <div t-if="!opts.length" class="o_bcw_empty">No hay opciones disponibles en este nivel.</div>
+                        </div>
+                    </div>
+
+                    <!-- resumen de clasificación -->
+                    <div class="o_bcw_summary" t-att-class="{o_bcw_summary_ok: classificationComplete}">
+                        <div class="o_bcw_summary_head">
+                            <span class="o_bcw_summary_title">Clasificación seleccionada</span>
+                            <span t-if="classificationComplete" class="o_bcw_chip o_bcw_chip_ok"><i class="fa fa-check"/> Completa</span>
+                            <span t-else="" class="o_bcw_chip o_bcw_chip_pending">Faltan niveles</span>
+                        </div>
+                        <div class="o_bcw_code">
+                            <t t-if="codeSegments.length">
+                                <t t-foreach="codeSegments" t-as="seg" t-key="seg_index">
+                                    <span t-attf-class="o_bcw_seg o_bcw_tone_{{seg.tone}}" t-esc="seg.text"/>
+                                    <span t-if="!seg_last" class="o_bcw_dash">-</span>
+                                </t>
+                            </t>
+                            <span t-else="" class="o_bcw_code_empty">La clave aparece aquí al completar los cuatro niveles</span>
+                        </div>
+                        <div class="o_bcw_summary_rows">
+                            <t t-foreach="levels" t-as="level" t-key="level.key">
+                                <t t-set="sel" t-value="selection(level.key)"/>
+                                <div class="o_bcw_summary_row" t-attf-class="o_bcw_tone_{{level.tone}}">
+                                    <span class="o_bcw_dot"/>
+                                    <span class="o_bcw_summary_label"><t t-esc="level.label"/>:</span>
+                                    <span t-if="sel" class="o_bcw_summary_value"><t t-esc="sel.code"/> · <t t-esc="sel.name"/></span>
+                                    <span t-else="" class="o_bcw_summary_value o_bcw_muted">—</span>
+                                </div>
+                            </t>
+                        </div>
+                        <p t-if="classificationComplete" class="o_bcw_hint">
+                            La referencia final será <code><t t-esc="state.session ? state.session.class_code : ''"/>-NN</code>,
+                            con el consecutivo que se reserva al agregar cada producto.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================== etapa 2 -->
+            <section class="o_bcw_stage" t-att-class="{o_bcw_stage_active: state.stage === 2, o_bcw_stage_locked: !stageReachable(2)}">
+                <header class="o_bcw_stage_head" t-on-click="() => this.goStage(2)">
+                    <span class="o_bcw_num o_bcw_tone_brand">2</span>
+                    <div class="o_bcw_stage_titles">
+                        <h2>Busca y agrega productos</h2>
+                        <p>Busca productos y agrégalos a la clasificación seleccionada.</p>
+                    </div>
+                    <div class="o_bcw_stage_mini" t-if="state.collapsed[2] and lines.length">
+                        <span class="o_bcw_chip"><t t-esc="lines.length"/> agregados</span>
+                    </div>
+                    <button class="o_bcw_collapse" t-att-class="{o_bcw_collapse_open: !state.collapsed[2]}"
+                            t-on-click.stop="() => this.toggleCollapse(2)"
+                            t-att-title="state.collapsed[2] ? 'Desplegar etapa 2' : 'Colapsar etapa 2'">
+                        <i class="fa fa-angle-left"/>
+                    </button>
+                </header>
+
+                <div class="o_bcw_stage_body" t-if="!state.collapsed[2]">
+                    <div t-if="!stageReachable(2)" class="o_bcw_empty">Completa la clasificación de la etapa 1 para buscar productos.</div>
+                    <t t-else="">
+                        <div class="o_bcw_searchbar">
+                            <i class="fa fa-search o_bcw_search_icon"/>
+                            <input type="text" class="o_bcw_input o_bcw_search_input"
+                                   placeholder="Buscar por nombre, referencia o código..."
+                                   t-on-input="onSearchInput" t-on-keydown="onSearchKeydown"/>
+                            <button class="o_bcw_scan" t-att-class="{o_bcw_scan_on: state.scan}" t-on-click="toggleScan"
+                                    title="Lector de código de barras: al leer un código con un resultado único, se agrega solo.">
+                                <i class="fa fa-barcode"/>
+                            </button>
+                        </div>
+
+                        <div class="o_bcw_table_wrap">
+                            <table class="o_bcw_table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th class="o_bcw_w_ref">Referencia</th>
+                                        <th class="o_bcw_w_brand">Marca</th>
+                                        <th class="o_bcw_w_act">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="state.search.records" t-as="record" t-key="record.id" t-att-class="{o_bcw_row_added: record.added}">
+                                        <td class="o_bcw_cell_name"><t t-esc="record.name"/></td>
+                                        <td class="o_bcw_mono"><t t-esc="record.default_code or record.reference or '—'"/></td>
+                                        <td><t t-esc="record.brand or '—'"/></td>
+                                        <td class="o_bcw_w_act">
+                                            <span t-if="record.added" class="o_bcw_chip o_bcw_chip_ok"><i class="fa fa-check"/> Agregado</span>
+                                            <button t-else="" class="o_bcw_add" t-on-click="() => this.addProduct(record)"
+                                                    t-att-disabled="confirmed" title="Agregar a la clasificación">
+                                                <i class="fa fa-plus"/> Agregar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr t-if="!state.search.records.length">
+                                        <td colspan="4" class="o_bcw_empty">
+                                            <t t-if="state.search.loading">Buscando...</t>
+                                            <t t-else="">Sin resultados para esa búsqueda.</t>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="o_bcw_pager">
+                            <span class="o_bcw_pager_text">
+                                Mostrando <t t-esc="pageFrom"/> a <t t-esc="pageTo"/> de <t t-esc="state.search.total"/> resultados
+                            </span>
+                            <div class="o_bcw_pager_btns">
+                                <button class="o_bcw_icon_btn" t-att-disabled="!hasPrevPage" t-on-click="prevPage"><i class="fa fa-angle-left"/></button>
+                                <button class="o_bcw_icon_btn" t-att-disabled="!hasNextPage" t-on-click="nextPage"><i class="fa fa-angle-right"/></button>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </section>
+
+            <!-- ============================================== etapa 3 -->
+            <section class="o_bcw_stage" t-att-class="{o_bcw_stage_active: state.stage === 3, o_bcw_stage_locked: !stageReachable(3)}">
+                <header class="o_bcw_stage_head" t-on-click="() => this.goStage(3)">
+                    <span class="o_bcw_num o_bcw_tone_classifier">3</span>
+                    <div class="o_bcw_stage_titles">
+                        <h2>Actualiza nombres y unidades de producto</h2>
+                        <p>Revisa el nombre y la unidad de cada producto antes de generar las claves.</p>
+                    </div>
+                    <div class="o_bcw_stage3_meta" t-if="classificationComplete">
+                        <div class="o_bcw_meta_line">
+                            <span class="o_bcw_meta_label">Clasificación:</span>
+                            <span class="o_bcw_code o_bcw_code_sm">
+                                <t t-foreach="codeSegments" t-as="seg" t-key="seg_index">
+                                    <span t-attf-class="o_bcw_seg o_bcw_tone_{{seg.tone}}" t-esc="seg.text"/>
+                                    <span t-if="!seg_last" class="o_bcw_dash">-</span>
+                                </t>
+                            </span>
+                        </div>
+                        <div class="o_bcw_meta_line o_bcw_muted">Productos agregados: <strong t-esc="lines.length"/></div>
+                    </div>
+                </header>
+
+                <div class="o_bcw_stage_body">
+                    <div t-if="confirmed" class="o_bcw_done">
+                        <i class="fa fa-check-circle"/>
+                        <div>
+                            <strong>Clasificación aplicada.</strong>
+                            <span>Se escribieron <t t-esc="lines.length"/> claves definitivas en el catálogo.</span>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" t-on-click="openProducts">Ver productos</button>
+                        <button class="btn btn-sm btn-primary" t-on-click="startNew">Nueva clasificación</button>
+                    </div>
+
+                    <div t-if="!lines.length" class="o_bcw_empty">Todavía no hay productos en esta clasificación. Agrégalos desde la etapa 2.</div>
+
+                    <t t-else="">
+                        <div class="o_bcw_table_wrap">
+                            <table class="o_bcw_table o_bcw_table_lines">
+                                <thead>
+                                    <tr>
+                                        <th class="o_bcw_w_grip"/>
+                                        <th class="o_bcw_w_num">#</th>
+                                        <th>Nombre actual</th>
+                                        <th>Nombre anterior</th>
+                                        <th class="o_bcw_w_uom">Unidad de medida</th>
+                                        <th class="o_bcw_w_ref2">Referencia</th>
+                                        <th class="o_bcw_w_cons">Consecutivo</th>
+                                        <th class="o_bcw_w_act2">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="lines" t-as="line" t-key="line.id"
+                                        t-att-class="{o_bcw_dragging: state.dragId === line.id, o_bcw_dragover: state.overId === line.id}"
+                                        t-on-dragover.prevent="() => this.onDragOver(line)"
+                                        t-on-drop.prevent="() => this.onDrop(line)">
+                                        <td class="o_bcw_w_grip">
+                                            <span class="o_bcw_grip" title="Arrastra para cambiar el orden" draggable="true"
+                                                  t-on-dragstart="(ev) => this.onDragStart(line, ev)" t-on-dragend="onDragEnd">
+                                                <i class="fa fa-ellipsis-v"/><i class="fa fa-ellipsis-v"/>
+                                            </span>
+                                        </td>
+                                        <td class="o_bcw_w_num o_bcw_mono"><t t-esc="line_index + 1"/></td>
+                                        <td>
+                                            <input type="text" class="o_bcw_input o_bcw_cell_input"
+                                                   t-att-value="line.new_name" t-att-readonly="confirmed"
+                                                   t-on-input="(ev) => this.onLineInput(line, 'new_name', ev)"
+                                                   t-on-change="(ev) => this.onNameChange(line, ev)"/>
+                                        </td>
+                                        <td class="o_bcw_muted"><t t-esc="line.old_name or '—'"/></td>
+                                        <td class="o_bcw_w_uom">
+                                            <select class="o_bcw_input o_bcw_cell_input" t-att-disabled="confirmed"
+                                                    t-on-change="(ev) => this.onUomChange(line, ev)">
+                                                <option value="" t-att-selected="!line.uom_id">—</option>
+                                                <option t-foreach="state.uoms" t-as="uom" t-key="uom.id"
+                                                        t-att-value="uom.id" t-att-selected="uom.id === line.uom_id" t-esc="uom.name"/>
+                                            </select>
+                                        </td>
+                                        <td class="o_bcw_mono o_bcw_ref"><t t-esc="line.reference or '—'"/></td>
+                                        <td class="o_bcw_mono"><t t-esc="line.consecutive_label or '—'"/></td>
+                                        <td class="o_bcw_w_act2">
+                                            <button class="o_bcw_icon_btn" t-on-click="() => this.editLine(line)" title="Editar producto"><i class="fa fa-pencil"/></button>
+                                            <button class="o_bcw_icon_btn o_bcw_danger" t-on-click="() => this.removeLine(line)"
+                                                    t-att-disabled="confirmed" title="Quitar de la lista"><i class="fa fa-trash-o"/></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="o_bcw_hint">
+                            Puedes cambiar el orden de los productos arrastrando el icono de 6 puntos.
+                            El consecutivo no cambia al reordenar: se reserva al agregar el producto.
+                        </p>
+                    </t>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================================================== navegación -->
+        <footer t-if="!state.loading" class="o_bcw_foot">
+            <button class="btn btn-sm btn-secondary" t-att-disabled="state.stage === 1" t-on-click="previous">
+                <i class="fa fa-arrow-left"/> Anterior
+            </button>
+            <span class="o_bcw_foot_state">Etapa <t t-esc="state.stage"/> de 3</span>
+            <button t-if="state.stage &lt; 3" class="btn btn-sm btn-primary" t-on-click="next">
+                Siguiente <i class="fa fa-arrow-right"/>
+            </button>
+            <button t-else="" class="btn btn-sm btn-primary" t-att-disabled="!lines.length or confirmed or state.busy" t-on-click="confirm">
+                Generar claves <i class="fa fa-arrow-right"/>
+            </button>
+        </footer>
+    </div>
+</t>
+
+<t t-name="biotex_catalog.LineEditorDialog">
+    <Dialog title="title" size="'md'">
+        <div class="o_bcw_editor">
+            <label class="o_bcw_editor_label">Nombre actual</label>
+            <input type="text" class="o_bcw_input" t-att-value="draft.new_name" t-att-readonly="props.readonly"
+                   t-on-input="(ev) => this.onInput('new_name', ev)"/>
+
+            <label class="o_bcw_editor_label">Nombre anterior</label>
+            <input type="text" class="o_bcw_input" t-att-value="props.line.old_name" readonly="readonly"/>
+
+            <label class="o_bcw_editor_label">Unidad de medida</label>
+            <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onInput('uom_id', ev)">
+                <option value="" t-att-selected="!draft.uom_id">—</option>
+                <option t-foreach="props.uoms" t-as="uom" t-key="uom.id"
+                        t-att-value="uom.id" t-att-selected="uom.id === draft.uom_id" t-esc="uom.name"/>
+            </select>
+
+            <label class="o_bcw_editor_label">Referencia generada</label>
+            <input type="text" class="o_bcw_input o_bcw_mono" t-att-value="props.line.reference" readonly="readonly"/>
+
+            <p class="o_bcw_hint o_bcw_editor_note">
+                La captura completa —descripción estructurada, medidas, presentación, empaque y uso clínico—
+                se agrega en una fase posterior sobre esta misma pantalla.
+            </p>
+        </div>
+        <t t-set-slot="footer">
+            <button class="btn btn-primary" t-att-disabled="props.readonly" t-on-click="save">Guardar</button>
+            <button class="btn btn-secondary" t-on-click="() => props.close()">Cerrar</button>
+        </t>
+    </Dialog>
+</t>
+
+</templates>

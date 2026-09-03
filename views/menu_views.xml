@@ -3,7 +3,11 @@
     <menuitem id="menu_catalog_root" name="Catálogo" sequence="12" web_icon="biotex_catalog,static/description/icon.svg"
               groups="biotex_base.group_biotex_delegation"/>
     <menuitem id="menu_biotex_products" name="Productos" parent="menu_catalog_root" sequence="10" action="action_biotex_products"/>
-    <menuitem id="menu_biotex_classifier" name="Asistente de clasificación" parent="menu_catalog_root" sequence="20"
+    <menuitem id="menu_biotex_classification_workspace" name="Asistente de clasificación" parent="menu_catalog_root" sequence="20"
+              action="action_biotex_classification_workspace" groups="biotex_catalog.group_catalog_classifier"/>
+    <menuitem id="menu_biotex_classification_sessions" name="Sesiones de clasificación" parent="menu_catalog_root" sequence="21"
+              action="action_biotex_classification_sessions" groups="biotex_catalog.group_catalog_classifier"/>
+    <menuitem id="menu_biotex_classifier" name="Asistente guiado (1 a 1)" parent="menu_catalog_root" sequence="22"
               action="action_biotex_classifier" groups="biotex_catalog.group_catalog_classifier"/>
     <menuitem id="menu_biotex_pending" name="Pendientes de clasificar" parent="menu_catalog_root" sequence="30" action="action_biotex_products_pending"/>
     <menuitem id="menu_catalog_config" name="Configuración" parent="menu_catalog_root" sequence="90"/>

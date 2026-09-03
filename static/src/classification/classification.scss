@@ -1,0 +1,321 @@
+// Asistente de clasificación masiva.
+// Espacio de trabajo, no formulario: fondo muy claro, tarjetas blancas, sombras mínimas
+// y color solo como indicador funcional (grupo verde, familia morado, clasificador naranja, marca azul).
+
+.o_bcw {
+    --bcw-group: #16a34a;
+    --bcw-group-soft: #dcfce7;
+    --bcw-family: #7c3aed;
+    --bcw-family-soft: #ede9fe;
+    --bcw-classifier: #ea580c;
+    --bcw-classifier-soft: #ffedd5;
+    --bcw-brand: #2563eb;
+    --bcw-brand-soft: #dbeafe;
+    --bcw-active: #7c3aed;
+    --bcw-bg: #f6f7f9;
+    --bcw-card: #ffffff;
+    --bcw-rule: #e4e7ec;
+    --bcw-ink: #1d2939;
+    --bcw-ink-2: #667085;
+    --bcw-radius: 10px;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bcw-bg);
+    color: var(--bcw-ink);
+    font-size: 13px;
+
+    // ---------------------------------------------------------------- tonos
+    .o_bcw_tone_group   { --tone: var(--bcw-group);      --tone-soft: var(--bcw-group-soft); }
+    .o_bcw_tone_family  { --tone: var(--bcw-family);     --tone-soft: var(--bcw-family-soft); }
+    .o_bcw_tone_classifier { --tone: var(--bcw-classifier); --tone-soft: var(--bcw-classifier-soft); }
+    .o_bcw_tone_brand   { --tone: var(--bcw-brand);      --tone-soft: var(--bcw-brand-soft); }
+
+    // ---------------------------------------------------------------- encabezado
+    .o_bcw_top {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 20px;
+        background: var(--bcw-card);
+        border-bottom: 1px solid var(--bcw-rule);
+        flex: 0 0 auto;
+
+        h1 { font-size: 18px; font-weight: 600; margin: 0; line-height: 1.2; }
+        p { font-size: 12px; color: var(--bcw-ink-2); margin: 2px 0 0; }
+    }
+    .o_bcw_top_titles { flex: 1 1 auto; min-width: 0; }
+    .o_bcw_top_actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .o_bcw_link { color: var(--bcw-ink-2); text-decoration: none; }
+    .o_bcw_link:hover { color: var(--bcw-ink); }
+    .o_bcw_busy { color: var(--bcw-active); }
+
+    .o_bcw_loading { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; color: var(--bcw-ink-2); }
+
+    .o_bcw_body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+    // ---------------------------------------------------------------- borradores
+    .o_bcw_drafts {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        padding: 8px 12px; background: var(--bcw-family-soft); border-radius: var(--bcw-radius);
+        color: #5b21b6; font-size: 12px;
+    }
+    .o_bcw_draft_chip {
+        border: 1px solid rgba(124, 58, 237, .3); background: #fff; color: #5b21b6;
+        border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .o_bcw_draft_count { background: var(--bcw-family); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; }
+
+    // ---------------------------------------------------------------- etapas
+    .o_bcw_stage {
+        background: var(--bcw-card);
+        border: 1px solid var(--bcw-rule);
+        border-radius: var(--bcw-radius);
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+        overflow: hidden;
+    }
+    .o_bcw_stage_active { border-color: var(--bcw-active); box-shadow: 0 0 0 3px rgba(124, 58, 237, .10); }
+    .o_bcw_stage_locked { opacity: .72; }
+
+    .o_bcw_stage_head {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 16px; cursor: pointer; user-select: none;
+    }
+    .o_bcw_stage_titles { flex: 1 1 auto; min-width: 0; }
+    .o_bcw_stage_titles h2 { font-size: 15px; font-weight: 600; margin: 0; line-height: 1.25; }
+    .o_bcw_stage_titles p { font-size: 12px; color: var(--bcw-ink-2); margin: 2px 0 0; }
+
+    // indicador circular: el número pesa más que el título
+    .o_bcw_num {
+        flex: 0 0 auto;
+        width: 40px; height: 40px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; font-weight: 700; line-height: 1;
+        color: var(--tone); background: var(--tone-soft);
+        border: 2px solid var(--tone);
+    }
+    .o_bcw_stage_active .o_bcw_num { box-shadow: 0 0 0 4px rgba(124, 58, 237, .14); }
+
+    .o_bcw_collapse {
+        flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px;
+        border: 1px solid var(--bcw-rule); background: #fff; color: var(--bcw-ink-2);
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
+        transition: transform .15s ease;
+    }
+    .o_bcw_collapse:hover { color: var(--bcw-ink); border-color: #cdd3dc; }
+    .o_bcw_collapse_open { transform: rotate(-90deg); }
+
+    .o_bcw_stage_body { padding: 0 16px 16px; }
+    .o_bcw_stage_mini { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+    .o_bcw_stage3_meta { flex: 0 0 auto; text-align: right; }
+    .o_bcw_meta_line { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 12px; }
+    .o_bcw_meta_label { color: var(--bcw-ink-2); }
+
+    // ---------------------------------------------------------------- etapa 1: tarjetas de nivel
+    .o_bcw_levels {
+        display: grid; gap: 10px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .o_bcw_pick {
+        display: flex; align-items: flex-start; gap: 10px; text-align: left;
+        padding: 10px 12px; border-radius: 8px; cursor: pointer;
+        border: 1px solid var(--bcw-rule); background: #fff; color: inherit;
+        transition: border-color .12s ease, box-shadow .12s ease;
+        min-width: 0;
+    }
+    .o_bcw_pick:hover:not(:disabled) { border-color: var(--tone); }
+    .o_bcw_pick:disabled { cursor: not-allowed; background: #fbfcfd; }
+    .o_bcw_picked { border-color: var(--tone); background: linear-gradient(0deg, #fff, #fff); }
+    .o_bcw_open { border-color: var(--tone); box-shadow: 0 0 0 3px var(--tone-soft); }
+
+    .o_bcw_pick_icon {
+        flex: 0 0 auto; width: 26px; height: 26px; border-radius: 6px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--tone-soft); color: var(--tone); font-size: 12px;
+    }
+    .o_bcw_pick_body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .o_bcw_pick_label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-ink-2); font-weight: 600; }
+    .o_bcw_pick_code { font-family: var(--o-font-family-monospace, monospace); font-size: 13px; font-weight: 700; color: var(--tone); }
+    .o_bcw_pick_name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .o_bcw_pick_note { font-size: 11px; color: var(--bcw-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .o_bcw_pick_empty { font-size: 12px; color: var(--bcw-ink-2); font-style: italic; }
+    .o_bcw_pick_state { flex: 0 0 auto; color: var(--tone); font-size: 13px; width: 14px; }
+    .o_bcw_pick_toggle { flex: 0 0 auto; color: var(--bcw-ink-2); transition: transform .15s ease; }
+    .o_bcw_open .o_bcw_pick_toggle { transform: rotate(-90deg); }
+
+    // ---------------------------------------------------------------- panel de opciones
+    .o_bcw_picker {
+        margin-top: 10px; border: 1px solid var(--tone); border-radius: 8px;
+        background: #fff; overflow: hidden;
+    }
+    .o_bcw_picker_head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; background: var(--tone-soft); color: var(--tone);
+        strong { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+        .o_bcw_input { flex: 1 1 auto; }
+    }
+    .o_bcw_picker_list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; }
+    .o_bcw_opt {
+        display: flex; align-items: baseline; gap: 10px; text-align: left;
+        padding: 7px 12px; border: 0; border-bottom: 1px solid var(--bcw-rule); background: #fff;
+        cursor: pointer; color: inherit; min-width: 0;
+    }
+    .o_bcw_opt:last-child { border-bottom: 0; }
+    .o_bcw_opt:hover { background: var(--tone-soft); }
+    .o_bcw_opt_active { background: var(--tone-soft); font-weight: 600; }
+    .o_bcw_opt_code {
+        flex: 0 0 auto; min-width: 52px; font-family: var(--o-font-family-monospace, monospace);
+        font-weight: 700; color: var(--tone); font-size: 12.5px;
+    }
+    .o_bcw_opt_name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .o_bcw_opt_note { flex: 0 0 auto; font-size: 11px; color: var(--bcw-ink-2); }
+    .o_bcw_opt_check { color: var(--tone); }
+
+    // ---------------------------------------------------------------- resumen
+    .o_bcw_summary {
+        margin-top: 12px; padding: 12px 14px;
+        border: 1px solid var(--bcw-rule); border-radius: 8px; background: #fbfcfd;
+    }
+    .o_bcw_summary_ok { background: #fff; border-color: #d0d5dd; }
+    .o_bcw_summary_head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .o_bcw_summary_title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-ink-2); font-weight: 600; }
+
+    .o_bcw_code { display: inline-flex; align-items: baseline; font-family: var(--o-font-family-monospace, monospace); font-size: 22px; font-weight: 700; }
+    .o_bcw_code_sm { font-size: 14px; }
+    .o_bcw_code_empty { font-family: inherit; font-size: 12px; font-weight: 400; color: var(--bcw-ink-2); font-style: italic; }
+    .o_bcw_seg { color: var(--tone); }
+    .o_bcw_dash { color: var(--bcw-ink-2); padding: 0 1px; }
+
+    .o_bcw_summary_rows { margin-top: 10px; display: grid; gap: 4px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .o_bcw_summary_row { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; }
+    .o_bcw_summary_label { color: var(--bcw-ink-2); flex: 0 0 auto; }
+    .o_bcw_summary_value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .o_bcw_dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: 0 0 auto; }
+
+    // ---------------------------------------------------------------- etapa 2: búsqueda
+    .o_bcw_searchbar { display: flex; align-items: center; gap: 8px; position: relative; margin-bottom: 10px; }
+    .o_bcw_search_icon { position: absolute; left: 10px; color: var(--bcw-ink-2); pointer-events: none; }
+    .o_bcw_search_input { flex: 1 1 auto; padding-left: 30px; height: 34px; }
+    .o_bcw_scan {
+        flex: 0 0 auto; width: 34px; height: 34px; border-radius: 8px;
+        border: 1px solid var(--bcw-rule); background: #fff; color: var(--bcw-ink-2); cursor: pointer;
+    }
+    .o_bcw_scan_on { border-color: var(--bcw-brand); background: var(--bcw-brand-soft); color: var(--bcw-brand); }
+
+    // ---------------------------------------------------------------- tablas
+    .o_bcw_table_wrap { overflow-x: auto; border: 1px solid var(--bcw-rule); border-radius: 8px; }
+    .o_bcw_table { width: 100%; border-collapse: collapse; background: #fff; }
+    .o_bcw_table th {
+        text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--bcw-ink-2); font-weight: 600; padding: 8px 10px; background: #fbfcfd;
+        border-bottom: 1px solid var(--bcw-rule); white-space: nowrap;
+    }
+    .o_bcw_table td { padding: 6px 10px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
+    .o_bcw_table tbody tr:last-child td { border-bottom: 0; }
+    .o_bcw_table tbody tr:hover { background: #fbfcfd; }
+    .o_bcw_row_added { color: var(--bcw-ink-2); }
+    .o_bcw_cell_name { min-width: 240px; }
+    .o_bcw_mono { font-family: var(--o-font-family-monospace, monospace); font-size: 12px; white-space: nowrap; }
+    .o_bcw_ref { font-weight: 600; }
+    .o_bcw_muted { color: var(--bcw-ink-2); }
+    .o_bcw_w_ref { width: 180px; }
+    .o_bcw_w_brand { width: 140px; }
+    .o_bcw_w_act { width: 120px; }
+    .o_bcw_w_grip { width: 28px; }
+    .o_bcw_w_num { width: 36px; }
+    .o_bcw_w_uom { width: 150px; }
+    .o_bcw_w_ref2 { width: 190px; }
+    .o_bcw_w_cons { width: 100px; }
+    .o_bcw_w_act2 { width: 76px; white-space: nowrap; }
+
+    .o_bcw_empty { padding: 18px 12px; text-align: center; color: var(--bcw-ink-2); font-size: 12.5px; }
+
+    .o_bcw_pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; }
+    .o_bcw_pager_text { font-size: 12px; color: var(--bcw-ink-2); }
+    .o_bcw_pager_btns { display: flex; gap: 4px; }
+
+    // ---------------------------------------------------------------- controles compactos
+    .o_bcw_input {
+        border: 1px solid var(--bcw-rule); border-radius: 6px; padding: 4px 8px;
+        font-size: 12.5px; background: #fff; color: var(--bcw-ink); width: 100%; height: 28px;
+    }
+    .o_bcw_input:focus { outline: none; border-color: var(--bcw-active); box-shadow: 0 0 0 3px rgba(124, 58, 237, .12); }
+    .o_bcw_input[readonly], .o_bcw_input:disabled { background: #f7f8fa; color: var(--bcw-ink-2); }
+    .o_bcw_cell_input { height: 26px; }
+
+    .o_bcw_icon_btn {
+        width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--bcw-rule);
+        background: #fff; color: var(--bcw-ink-2); cursor: pointer; padding: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .o_bcw_icon_btn:hover:not(:disabled) { color: var(--bcw-ink); border-color: #cdd3dc; }
+    .o_bcw_icon_btn:disabled { opacity: .4; cursor: not-allowed; }
+    .o_bcw_danger:hover:not(:disabled) { color: #b42318; border-color: #fda29b; background: #fef3f2; }
+
+    // botón agregar: mismo peso visual que el de eliminar
+    .o_bcw_add {
+        border: 1px solid var(--bcw-brand); background: var(--bcw-brand-soft); color: var(--bcw-brand);
+        border-radius: 6px; padding: 2px 8px; height: 26px; font-size: 12px; font-weight: 600; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .o_bcw_add:hover:not(:disabled) { background: var(--bcw-brand); color: #fff; }
+    .o_bcw_add:disabled { opacity: .4; cursor: not-allowed; }
+
+    .o_bcw_chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600;
+        background: #f2f4f7; color: var(--bcw-ink-2);
+    }
+    .o_bcw_chip_ok { background: var(--bcw-group-soft); color: #15803d; }
+    .o_bcw_chip_pending { background: var(--bcw-classifier-soft); color: #c2410c; }
+
+    .o_bcw_hint { font-size: 11.5px; color: var(--bcw-ink-2); margin: 8px 0 0; }
+    .o_bcw_hint code { font-family: var(--o-font-family-monospace, monospace); color: var(--bcw-ink); background: #f2f4f7; padding: 0 4px; border-radius: 4px; }
+
+    // ---------------------------------------------------------------- arrastrar para ordenar
+    .o_bcw_grip {
+        display: inline-flex; gap: 1px; cursor: grab; color: #98a2b3; padding: 2px;
+        i { font-size: 12px; }
+    }
+    .o_bcw_grip:active { cursor: grabbing; }
+    .o_bcw_dragging { opacity: .45; }
+    .o_bcw_dragover td { box-shadow: inset 0 2px 0 var(--bcw-active); }
+
+    // ---------------------------------------------------------------- cierre
+    .o_bcw_done {
+        display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+        padding: 10px 14px; border-radius: 8px; background: var(--bcw-group-soft); color: #15803d;
+        .fa-check-circle { font-size: 20px; }
+        div { flex: 1 1 auto; display: flex; flex-direction: column; }
+        span { color: #166534; font-size: 12.5px; }
+    }
+
+    .o_bcw_foot {
+        flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+        padding: 10px 20px; background: var(--bcw-card); border-top: 1px solid var(--bcw-rule);
+    }
+    .o_bcw_foot_state { flex: 1 1 auto; text-align: center; font-size: 12px; color: var(--bcw-ink-2); }
+
+    // ---------------------------------------------------------------- responsive (prioridad escritorio)
+    @media (max-width: 1200px) {
+        .o_bcw_levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 768px) {
+        .o_bcw_levels { grid-template-columns: 1fr; }
+        .o_bcw_summary_rows { grid-template-columns: 1fr; }
+        .o_bcw_body { padding: 10px 12px 16px; }
+        .o_bcw_top { flex-wrap: wrap; }
+    }
+}
+
+// el diálogo vive fuera del árbol .o_bcw
+.o_bcw_editor {
+    display: flex; flex-direction: column; gap: 4px;
+    .o_bcw_editor_label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #667085; font-weight: 600; margin-top: 8px; }
+    .o_bcw_input { border: 1px solid #e4e7ec; border-radius: 6px; padding: 5px 9px; font-size: 13px; width: 100%; height: 32px; }
+    .o_bcw_input[readonly], .o_bcw_input:disabled { background: #f7f8fa; color: #667085; }
+    .o_bcw_mono { font-family: var(--o-font-family-monospace, monospace); }
+    .o_bcw_editor_note { font-size: 11.5px; color: #667085; margin-top: 14px; }
+}
