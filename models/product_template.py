@@ -176,6 +176,9 @@ class ProductTemplate(models.Model):
         clean = {k: v for k, v in vals.items() if k in self._fields}
         if clean.get('biotex_family_id'):
             clean['categ_id'] = clean['biotex_family_id']
+        if not product_id and not clean.get('name'):
+            clean['name'] = ' '.join(x.strip() for x in (
+                clean.get('biotex_name'), clean.get('biotex_measure'), clean.get('biotex_content')) if x) or 'Producto sin nombre'
         if product_id:
             product.write(clean)
         else:
