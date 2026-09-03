@@ -203,6 +203,20 @@ class ProductTemplate(models.Model):
             'biotex_photo_count', 'image_128', 'description'])
 
     # ------------------------------------------------------------------ búsqueda por sinónimo / referencia
+
+    @api.model
+    def name_search(self, name='', domain=None, operator='ilike', limit=100):
+        res = super().name_search(name, domain, operator, limit)
+        if name and operator in ('ilike', 'like', '=', '=ilike') and (not limit or len(res) < limit):
+            extra = (Domain('biotex_synonym_ids.name', 'ilike', name)
+                     | Domain('biotex_reference', 'ilike', name)
+                     | Domain('biotex_brand_id.name', 'ilike', name))
+            found = [r[0] for r in res]
+            records = self.search_fetch(Domain(domain or Domain.TRUE) & extra & Domain('id', 'not in', found),
+                                        ['display_name'], limit=(limit - len(res)) if limit else None)
+            res += [(r.id, r.display_name) for r in records]
+        return res
+
     @api.model
     def _search_display_name(self, operator, value):
         domain = super()._search_display_name(operator, value)
