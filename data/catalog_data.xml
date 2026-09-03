@@ -4,32 +4,32 @@
     <record id="categ_group_consumables" model="product.category">
         <field name="name">Consumibles</field>
         <field name="biotex_code">CON</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <record id="categ_group_medicines" model="product.category">
         <field name="name">Medicamentos</field>
         <field name="biotex_code">MED</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <record id="categ_group_instruments" model="product.category">
         <field name="name">Instrumental</field>
         <field name="biotex_code">INS</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <record id="categ_group_equipment" model="product.category">
         <field name="name">Equipo médico</field>
         <field name="biotex_code">EQM</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <record id="categ_group_pumps" model="product.category">
         <field name="name">Bombas</field>
         <field name="biotex_code">BOM</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <record id="categ_group_electronics" model="product.category">
         <field name="name">Equipo electrónico general</field>
         <field name="biotex_code">ELE</field>
-        <field name="parent_id" ref="product.product_category_all"/>
+        <field name="parent_id" ref="product.product_category_goods"/>
     </record>
     <!-- Familia de ejemplo: inhaloterapia (línea de mayor volumen) -->
     <record id="categ_family_masks" model="product.category">

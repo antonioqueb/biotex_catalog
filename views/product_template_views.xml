@@ -5,7 +5,8 @@
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_only_form_view"/>
         <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
+            <xpath expr="//sheet" position="before">
+                <header>
                 <button name="action_open_classifier" type="object" string="Clasificar con asistente" class="btn-primary"
                         invisible="biotex_class_state == 'complete'" groups="biotex_catalog.group_catalog_classifier"/>
                 <button name="action_assign_clave" type="object" string="Asignar clave"
@@ -13,6 +14,7 @@
                 <button name="action_print_qr_label" type="object" string="Etiqueta QR" icon="fa-qrcode"
                         invisible="not default_code"/>
                 <field name="biotex_class_state" widget="biotex_class_badge"/>
+                </header>
             </xpath>
             <xpath expr="//field[@name='name']" position="before">
                 <field name="biotex_missing" invisible="1"/>
@@ -91,7 +93,7 @@
                 <filter name="biotex_complete" string="Completos" domain="[('biotex_class_state', '=', 'complete')]"/>
                 <separator/>
             </xpath>
-            <xpath expr="//group" position="inside">
+            <xpath expr="//search" position="inside">
                 <filter name="group_biotex_family" string="Familia" context="{'group_by': 'biotex_family_id'}"/>
                 <filter name="group_biotex_brand" string="Marca" context="{'group_by': 'biotex_brand_id'}"/>
                 <filter name="group_biotex_state" string="Clasificación" context="{'group_by': 'biotex_class_state'}"/>
