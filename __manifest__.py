@@ -8,8 +8,8 @@
     'icon': '/biotex_catalog/static/description/icon.svg',
     'depends': ['biotex_base', 'product', 'stock', 'purchase'],
     'data': [
-        'security/ir.model.access.csv',
         'security/catalog_security.xml',
+        'security/ir.model.access.csv',
         'data/schema_data.xml',
         'views/biotex_schema_views.xml',
         'views/biotex_brand_views.xml',
