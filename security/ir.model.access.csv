@@ -1,4 +1,16 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_biotex_division_user,biotex.division user,model_biotex_division,biotex_base.group_biotex_delegation,1,0,0,0
+access_biotex_division_direction,biotex.division direction,model_biotex_division,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_group_user,biotex.group user,model_biotex_group,biotex_base.group_biotex_delegation,1,0,0,0
+access_biotex_group_direction,biotex.group direction,model_biotex_group,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_classifier_user,biotex.classifier user,model_biotex_classifier,biotex_base.group_biotex_delegation,1,0,0,0
+access_biotex_classifier_direction,biotex.classifier direction,model_biotex_classifier,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_specialty_user,biotex.specialty user,model_biotex_specialty,biotex_base.group_biotex_delegation,1,0,0,0
+access_biotex_specialty_direction,biotex.specialty direction,model_biotex_specialty,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_mt_subclass_user,biotex.mt.subclass user,model_biotex_mt_subclass,biotex_base.group_biotex_delegation,1,0,0,0
+access_biotex_mt_subclass_direction,biotex.mt.subclass direction,model_biotex_mt_subclass,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_generic_user,biotex.generic user,model_biotex_generic,biotex_base.group_biotex_delegation,1,1,1,0
+access_biotex_generic_direction,biotex.generic direction,model_biotex_generic,biotex_base.group_biotex_direction,1,1,1,1
 access_biotex_brand_user,biotex.brand user,model_biotex_brand,biotex_base.group_biotex_delegation,1,1,1,0
 access_biotex_brand_direction,biotex.brand direction,model_biotex_brand,biotex_base.group_biotex_direction,1,1,1,1
 access_biotex_equipment_user,biotex.equipment user,model_biotex_equipment,biotex_base.group_biotex_delegation,1,1,1,0
@@ -8,3 +20,4 @@ access_biotex_reorder_wizard,biotex.reorder.wizard,model_biotex_reorder_wizard,b
 access_product_category_direction,product.category direction,product.model_product_category,biotex_base.group_biotex_direction,1,1,1,1
 access_product_template_delegation,product.template delegation,product.model_product_template,biotex_base.group_biotex_delegation,1,1,1,0
 access_product_product_delegation,product.product delegation,product.model_product_product,biotex_base.group_biotex_delegation,1,1,1,0
+access_product_tag_delegation,product.tag delegation,product.model_product_tag,biotex_base.group_biotex_delegation,1,0,0,0

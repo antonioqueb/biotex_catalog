@@ -7,40 +7,65 @@
         <field name="arch" type="xml">
             <xpath expr="//sheet" position="before">
                 <header>
-                <button name="action_open_classifier" type="object" string="Clasificar con asistente" class="btn-primary"
-                        invisible="biotex_class_state == 'complete'" groups="biotex_catalog.group_catalog_classifier"/>
-                <button name="action_assign_clave" type="object" string="Asignar clave"
-                        invisible="default_code or biotex_family_id == False"/>
-                <button name="action_print_qr_label" type="object" string="Etiqueta QR" icon="fa-qrcode"
-                        invisible="not default_code"/>
-                <field name="biotex_class_state" widget="biotex_class_badge"/>
+                    <button name="action_open_classifier" type="object" string="Clasificar con asistente" class="btn-primary"
+                            invisible="biotex_class_state == 'complete'" groups="biotex_catalog.group_catalog_classifier"/>
+                    <button name="action_assign_clave" type="object" string="Asignar clave"
+                            invisible="default_code or not biotex_family_id or not biotex_classifier_id or not biotex_brand_id"/>
+                    <button name="action_print_qr_label" type="object" string="Etiqueta QR" icon="fa-qrcode" invisible="not default_code"/>
+                    <field name="biotex_class_state" widget="biotex_class_badge"/>
                 </header>
             </xpath>
             <xpath expr="//field[@name='name']" position="before">
                 <field name="biotex_missing" invisible="1"/>
+                <field name="biotex_allowed_classifier_ids" invisible="1"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Clasificación" name="biotex">
                     <group>
-                        <group string="Descripción estructurada (nombre + medida + contenido)">
+                        <group string="Clave (GG-MMMM-FFF-CCC-NN)">
+                            <field name="biotex_group_id" widget="badge" decoration-info="biotex_group_id"/>
+                            <field name="biotex_division_id"/>
+                            <field name="biotex_family_id"/>
+                            <field name="biotex_classifier_id" options="{'no_create': True}"/>
+                            <field name="biotex_classifier_axis"/>
+                            <field name="biotex_brand_id"/>
+                            <field name="biotex_consecutive"/>
+                            <field name="biotex_generic_id"/>
+                            <field name="biotex_subclass_id" invisible="biotex_group_id.code != 'MT'" options="{'no_create': True}"/>
+                            <field name="biotex_regulated"/>
+                        </group>
+                        <group string="Descripción estructurada">
                             <field name="biotex_name"/>
                             <field name="biotex_measure"/>
                             <field name="biotex_content"/>
+                            <field name="biotex_package_type"/>
+                            <field name="biotex_package_qty"/>
                             <field name="biotex_usage_notes"/>
-                        </group>
-                        <group string="Identificación">
-                            <field name="biotex_group_id"/>
-                            <field name="biotex_family_id"/>
-                            <field name="biotex_consecutive"/>
-                            <field name="biotex_reference"/>
-                            <field name="biotex_own_code"/>
                             <field name="biotex_high_rotation"/>
                         </group>
-                        <group string="Marca y compatibilidad">
-                            <field name="biotex_brand_id"/>
+                        <group string="Identificación y origen">
+                            <field name="biotex_reference"/>
                             <field name="biotex_model"/>
+                            <field name="biotex_own_code"/>
+                            <field name="biotex_alt_code"/>
+                            <field name="biotex_legacy_code"/>
                             <field name="biotex_manufacturer_id"/>
+                            <field name="biotex_country_id"/>
+                            <field name="biotex_primary_distributor_id"/>
+                        </group>
+                        <group string="Uso clínico">
+                            <field name="biotex_main_equipment_id"/>
                             <field name="biotex_equipment_ids" widget="many2many_tags"/>
+                            <field name="biotex_main_specialty_id"/>
+                            <field name="biotex_specialty_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Niveles de precio (Precio 1 = precio de venta)">
+                            <field name="biotex_price_2"/>
+                            <field name="biotex_wholesale_2"/>
+                            <field name="biotex_price_3"/>
+                            <field name="biotex_wholesale_3"/>
+                            <field name="biotex_price_4"/>
+                            <field name="biotex_wholesale_4"/>
                         </group>
                         <group string="Fotos (hasta 3)">
                             <field name="biotex_photo_count"/>
@@ -49,10 +74,12 @@
                             <field name="biotex_image_3" widget="image" options="{'size': [120, 120]}"/>
                         </group>
                     </group>
-                    <separator string="Sinónimos y equivalencias"/>
+                    <separator string="Características"/>
+                    <field name="biotex_characteristics" placeholder="Material, esterilidad, compatibilidades, restricciones de la institución..."/>
+                    <separator string="Sinónimos"/>
                     <field name="biotex_synonym_ids">
                         <list editable="bottom">
-                            <field name="name" placeholder="ambú, resucitador..."/>
+                            <field name="name" placeholder="ambú, punzocat, parche de ECG..."/>
                             <field name="equivalent_tmpl_id"/>
                         </list>
                     </field>
@@ -67,9 +94,12 @@
         <field name="inherit_id" ref="product.product_template_tree_view"/>
         <field name="arch" type="xml">
             <field name="name" position="after">
+                <field name="biotex_group_id" optional="show"/>
+                <field name="biotex_family_id" optional="show"/>
+                <field name="biotex_classifier_id" optional="show"/>
                 <field name="biotex_brand_id" optional="show"/>
                 <field name="biotex_reference" optional="show"/>
-                <field name="biotex_family_id" optional="show"/>
+                <field name="biotex_generic_id" optional="hide"/>
                 <field name="biotex_class_state" widget="biotex_class_badge" optional="show"/>
                 <field name="biotex_missing" optional="hide"/>
             </field>
@@ -84,18 +114,27 @@
             <field name="name" position="after">
                 <field name="biotex_reference"/>
                 <field name="biotex_brand_id"/>
+                <field name="biotex_classifier_id"/>
+                <field name="biotex_generic_id"/>
                 <field name="biotex_synonym_ids"/>
                 <field name="biotex_equipment_ids"/>
+                <field name="biotex_specialty_ids"/>
+                <field name="biotex_legacy_code"/>
             </field>
             <xpath expr="//filter[@name='filter_to_sell']" position="before">
                 <filter name="biotex_unclassified" string="Sin clasificar" domain="[('biotex_class_state', '=', 'unclassified')]"/>
                 <filter name="biotex_no_photo" string="Sin foto" domain="[('biotex_class_state', '=', 'no_photo')]"/>
                 <filter name="biotex_complete" string="Completos" domain="[('biotex_class_state', '=', 'complete')]"/>
                 <separator/>
+                <filter name="biotex_regulated" string="Regulados COFEPRIS" domain="[('biotex_regulated', '=', True)]"/>
+                <separator/>
             </xpath>
             <xpath expr="//search" position="inside">
+                <filter name="group_biotex_group" string="Grupo" context="{'group_by': 'biotex_group_id'}"/>
                 <filter name="group_biotex_family" string="Familia" context="{'group_by': 'biotex_family_id'}"/>
+                <filter name="group_biotex_classifier" string="Clasificador" context="{'group_by': 'biotex_classifier_id'}"/>
                 <filter name="group_biotex_brand" string="Marca" context="{'group_by': 'biotex_brand_id'}"/>
+                <filter name="group_biotex_generic" string="Genérico" context="{'group_by': 'biotex_generic_id'}"/>
                 <filter name="group_biotex_state" string="Clasificación" context="{'group_by': 'biotex_class_state'}"/>
             </xpath>
         </field>
@@ -106,7 +145,7 @@
         <field name="model">product.template</field>
         <field name="arch" type="xml">
             <graph string="Avance de clasificación" type="bar" stacked="1">
-                <field name="biotex_family_id"/>
+                <field name="biotex_group_id"/>
                 <field name="biotex_class_state"/>
             </graph>
         </field>
@@ -117,7 +156,7 @@
         <field name="res_model">product.template</field>
         <field name="view_mode">list,kanban,form,graph</field>
         <field name="search_view_id" ref="product.product_template_search_view"/>
-        <field name="context">{'search_default_group_biotex_family': 1}</field>
+        <field name="context">{'search_default_group_biotex_group': 1, 'search_default_group_biotex_family': 1}</field>
     </record>
 
     <record id="action_biotex_products_pending" model="ir.actions.act_window">
@@ -136,7 +175,14 @@
         <field name="state">code</field>
         <field name="code">action = records.action_open_classifier()</field>
     </record>
-
+    <record id="action_server_assign_clave" model="ir.actions.server">
+        <field name="name">Asignar claves</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_assign_clave()</field>
+    </record>
     <record id="action_server_print_labels" model="ir.actions.server">
         <field name="name">Imprimir etiquetas QR</field>
         <field name="model_id" ref="product.model_product_template"/>

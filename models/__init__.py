@@ -1,3 +1,4 @@
+from . import biotex_schema
 from . import biotex_brand
 from . import biotex_equipment
 from . import biotex_synonym

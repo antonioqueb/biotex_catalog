@@ -1,0 +1,1005 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Esquema de clasificación v2 (fuente: Esquemas.xlsx + Modelo_Clasificacion_v2_Remapeo.xlsx). Generado; no editar a mano. -->
+    <record id="division_CNS" model="biotex.division">
+        <field name="code">CNS</field><field name="name">Consumible</field>
+        <field name="accounting_nature">Gasto / Costo de Venta</field><field name="inventory_policy">Reposicion continua por consumo</field>
+    </record>
+    <record id="division_BDU" model="biotex.division">
+        <field name="code">BDU</field><field name="name">Bien Duradero</field>
+        <field name="accounting_nature">Activo Fijo / Inversion</field><field name="inventory_policy">Compra por proyecto o licitacion</field>
+    </record>
+    <record id="division_SOP" model="biotex.division">
+        <field name="code">SOP</field><field name="name">Soporte y Repuesto</field>
+        <field name="accounting_nature">Gasto de Mantenimiento</field><field name="inventory_policy">Stock minimo por parque instalado</field>
+    </record>
+    <record id="group_MC" model="biotex.group">
+        <field name="code">MC</field><field name="name">Material de Curacion</field><field name="sequence">10</field>
+        <field name="division_id" ref="division_CNS"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Tipo de Articulo</field><field name="color">2</field>
+        <field name="note"></field>
+    </record>
+    <record id="group_CE" model="biotex.group">
+        <field name="code">CE</field><field name="name">Consumible de Equipo Medico</field><field name="sequence">20</field>
+        <field name="division_id" ref="division_CNS"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Equipo Destino</field><field name="color">4</field>
+        <field name="note">Solo funciona conectado a un equipo especifico.</field>
+    </record>
+    <record id="group_MT" model="biotex.group">
+        <field name="code">MT</field><field name="name">Medicamento</field><field name="sequence">30</field>
+        <field name="division_id" ref="division_CNS"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Forma Farmaceutica</field><field name="color">1</field>
+        <field name="note">Requiere registro sanitario, lote y caducidad.</field>
+    </record>
+    <record id="group_EM" model="biotex.group">
+        <field name="code">EM</field><field name="name">Equipo Medico</field><field name="sequence">40</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Sin Definir</field><field name="color">6</field>
+        <field name="note"></field>
+    </record>
+    <record id="group_IN" model="biotex.group">
+        <field name="code">IN</field><field name="name">Instrumental</field><field name="sequence">50</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Especialidad Quirurgica</field><field name="color">8</field>
+        <field name="note">El cliente corrigio la clave IU -&gt; IN en ESQUEMA.</field>
+    </record>
+    <record id="group_OR" model="biotex.group">
+        <field name="code">OR</field><field name="name">Ortopedia</field><field name="sequence">60</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Sin Definir</field><field name="color">3</field>
+        <field name="note"></field>
+    </record>
+    <record id="group_MM" model="biotex.group">
+        <field name="code">MM</field><field name="name">Mobiliario Medico</field><field name="sequence">70</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="False"/>
+        <field name="classifier_axis">Material de Fabricacion</field><field name="color">9</field>
+        <field name="note"></field>
+    </record>
+    <record id="group_MA" model="biotex.group">
+        <field name="code">MA</field><field name="name">Mobiliario Administrativo</field><field name="sequence">80</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="False"/>
+        <field name="classifier_axis">Material de Fabricacion</field><field name="color">10</field>
+        <field name="note"></field>
+    </record>
+    <record id="group_CN" model="biotex.group">
+        <field name="code">CN</field><field name="name">Cocina y Nutricion</field><field name="sequence">90</field>
+        <field name="division_id" ref="division_BDU"/><field name="regulated" eval="False"/>
+        <field name="classifier_axis">Tipo de Equipo / Material</field><field name="color">7</field>
+        <field name="note">Reclasificado a BDU: sus familias y clasificadores describen equipo, no consumo.</field>
+    </record>
+    <record id="group_AE" model="biotex.group">
+        <field name="code">AE</field><field name="name">Accesorio de Equipo Medico</field><field name="sequence">100</field>
+        <field name="division_id" ref="division_SOP"/><field name="regulated" eval="True"/>
+        <field name="classifier_axis">Sin Definir</field><field name="color">5</field>
+        <field name="note">Sin familias ni clasificadores definidos.</field>
+    </record>
+    <record id="group_RF" model="biotex.group">
+        <field name="code">RF</field><field name="name">Refacciones</field><field name="sequence">110</field>
+        <field name="division_id" ref="division_SOP"/><field name="regulated" eval="False"/>
+        <field name="classifier_axis">Tipo de Componente</field><field name="color">11</field>
+        <field name="note"></field>
+    </record>
+    <record id="clas_CE_EKG" model="biotex.classifier">
+        <field name="code">EKG</field><field name="name">Electrocardiografo / Monitor</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_ESG" model="biotex.classifier">
+        <field name="code">ESG</field><field name="name">Electrocirugia</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_EMG" model="biotex.classifier">
+        <field name="code">EMG</field><field name="name">Electromiografo</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_EST" model="biotex.classifier">
+        <field name="code">EST</field><field name="name">Electroestimulador / Tens</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_DEA" model="biotex.classifier">
+        <field name="code">DEA</field><field name="name">Desfibrilador</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_MPP" model="biotex.classifier">
+        <field name="code">MPP</field><field name="name">Marcapasos</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_EEG" model="biotex.classifier">
+        <field name="code">EEG</field><field name="name">Electroencefalografo</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_BIN" model="biotex.classifier">
+        <field name="code">BIN</field><field name="name">Bomba de Infusion</field>
+        <field name="group_id" ref="group_CE"/><field name="status">active</field>
+    </record>
+    <record id="clas_CE_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Generico / por Definir</field>
+        <field name="group_id" ref="group_CE"/><field name="status">pending</field>
+    </record>
+    <record id="clas_MC_GAS" model="biotex.classifier">
+        <field name="code">GAS</field><field name="name">Gasas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_VEN" model="biotex.classifier">
+        <field name="code">VEN</field><field name="name">Vendas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_APO" model="biotex.classifier">
+        <field name="code">APO</field><field name="name">Apositos Especializados</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_ALG" model="biotex.classifier">
+        <field name="code">ALG</field><field name="name">Algodon</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_COM" model="biotex.classifier">
+        <field name="code">COM</field><field name="name">Compresas Quirurgicas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_CIN" model="biotex.classifier">
+        <field name="code">CIN</field><field name="name">Cintas Medicas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_TEL" model="biotex.classifier">
+        <field name="code">TEL</field><field name="name">Telas Adhesivas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_TEG" model="biotex.classifier">
+        <field name="code">TEG</field><field name="name">Parches Transparentes de Fijacion</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_JER" model="biotex.classifier">
+        <field name="code">JER</field><field name="name">Jeringas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_AGU" model="biotex.classifier">
+        <field name="code">AGU</field><field name="name">Agujas Hipodermicas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_CAT" model="biotex.classifier">
+        <field name="code">CAT</field><field name="name">Cateteres Venosos Perifericos</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_LLA" model="biotex.classifier">
+        <field name="code">LLA</field><field name="name">Llaves de Paso</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_EXT" model="biotex.classifier">
+        <field name="code">EXT</field><field name="name">Extensiones y Conectores</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_SON" model="biotex.classifier">
+        <field name="code">SON</field><field name="name">Sondas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_TUB" model="biotex.classifier">
+        <field name="code">TUB</field><field name="name">Tubos Clinicos</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_CAN" model="biotex.classifier">
+        <field name="code">CAN</field><field name="name">Canulas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_DRE" model="biotex.classifier">
+        <field name="code">DRE</field><field name="name">Sistemas de Drenaje</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_ABS" model="biotex.classifier">
+        <field name="code">ABS</field><field name="name">Suturas Absorbibles</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_NAB" model="biotex.classifier">
+        <field name="code">NAB</field><field name="name">Suturas No Absorbibles</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_GRP" model="biotex.classifier">
+        <field name="code">GRP</field><field name="name">Grapas Quirurgicas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_PEG" model="biotex.classifier">
+        <field name="code">PEG</field><field name="name">Pegamentos Tisulares</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_GUA" model="biotex.classifier">
+        <field name="code">GUA</field><field name="name">Guantes</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_CUB" model="biotex.classifier">
+        <field name="code">CUB</field><field name="name">Cubrebocas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_BAT" model="biotex.classifier">
+        <field name="code">BAT</field><field name="name">Batas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_BUL" model="biotex.classifier">
+        <field name="code">BUL</field><field name="name">Bultos Quirurgicos</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_GOR" model="biotex.classifier">
+        <field name="code">GOR</field><field name="name">Gorros y Botas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_SOL" model="biotex.classifier">
+        <field name="code">SOL</field><field name="name">Soluciones Antisepticas</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_HEM" model="biotex.classifier">
+        <field name="code">HEM</field><field name="name">Agentes Hemostaticos</field>
+        <field name="group_id" ref="group_MC"/><field name="status">active</field>
+    </record>
+    <record id="clas_MC_CHU" model="biotex.classifier">
+        <field name="code">CHU</field><field name="name">Por Definir (Heredado del Trabajo Manual)</field>
+        <field name="group_id" ref="group_MC"/><field name="status">pending</field>
+    </record>
+    <record id="clas_MC_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Generico / por Definir</field>
+        <field name="group_id" ref="group_MC"/><field name="status">pending</field>
+    </record>
+    <record id="clas_MT_TAB" model="biotex.classifier">
+        <field name="code">TAB</field><field name="name">Tableta / Comprimido</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_CAP" model="biotex.classifier">
+        <field name="code">CAP</field><field name="name">Capsula</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_POL" model="biotex.classifier">
+        <field name="code">POL</field><field name="name">Polvo</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_GRA" model="biotex.classifier">
+        <field name="code">GRA</field><field name="name">Gragea</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_SUS" model="biotex.classifier">
+        <field name="code">SUS</field><field name="name">Suspension</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_JAR" model="biotex.classifier">
+        <field name="code">JAR</field><field name="name">Jarabe</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_AMP" model="biotex.classifier">
+        <field name="code">AMP</field><field name="name">Ampolleta</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_EMU" model="biotex.classifier">
+        <field name="code">EMU</field><field name="name">Emulsion</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_ELX" model="biotex.classifier">
+        <field name="code">ELX</field><field name="name">Elixir</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_GTT" model="biotex.classifier">
+        <field name="code">GTT</field><field name="name">Gotas</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_CRE" model="biotex.classifier">
+        <field name="code">CRE</field><field name="name">Crema</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_UNG" model="biotex.classifier">
+        <field name="code">UNG</field><field name="name">Unguento / Pomada</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_GEL" model="biotex.classifier">
+        <field name="code">GEL</field><field name="name">Gel</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_PAS" model="biotex.classifier">
+        <field name="code">PAS</field><field name="name">Pasta</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_AER" model="biotex.classifier">
+        <field name="code">AER</field><field name="name">Aerosol</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_ESM" model="biotex.classifier">
+        <field name="code">ESM</field><field name="name">Espuma</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_MT_PAR" model="biotex.classifier">
+        <field name="code">PAR</field><field name="name">Parche Transdermico</field>
+        <field name="group_id" ref="group_MT"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Cirugia General / Multiusos</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_GIN" model="biotex.classifier">
+        <field name="code">GIN</field><field name="name">Ginecologia y Obstetricia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_ORT" model="biotex.classifier">
+        <field name="code">ORT</field><field name="name">Ortopedia y Traumatologia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_OPH" model="biotex.classifier">
+        <field name="code">OPH</field><field name="name">Oftalmologia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_ENT" model="biotex.classifier">
+        <field name="code">ENT</field><field name="name">Otorrinolaringologia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_URO" model="biotex.classifier">
+        <field name="code">URO</field><field name="name">Urologia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_NEU" model="biotex.classifier">
+        <field name="code">NEU</field><field name="name">Neurocirugia</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_CVR" model="biotex.classifier">
+        <field name="code">CVR</field><field name="name">Cardiovascular y Torax</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_IN_PED" model="biotex.classifier">
+        <field name="code">PED</field><field name="name">Pediatria</field>
+        <field name="group_id" ref="group_IN"/><field name="status">active</field>
+    </record>
+    <record id="clas_MM_INO" model="biotex.classifier">
+        <field name="code">INO</field><field name="name">Acero Inoxidable Quirurgico</field>
+        <field name="group_id" ref="group_MM"/><field name="status">active</field>
+    </record>
+    <record id="clas_MM_TUB" model="biotex.classifier">
+        <field name="code">TUB</field><field name="name">Acero Tubular Pintado</field>
+        <field name="group_id" ref="group_MM"/><field name="status">active</field>
+    </record>
+    <record id="clas_MM_TAP" model="biotex.classifier">
+        <field name="code">TAP</field><field name="name">Mobiliario Tapizado</field>
+        <field name="group_id" ref="group_MM"/><field name="status">active</field>
+    </record>
+    <record id="clas_MM_MIX" model="biotex.classifier">
+        <field name="code">MIX</field><field name="name">Materiales Mixtos</field>
+        <field name="group_id" ref="group_MM"/><field name="status">active</field>
+    </record>
+    <record id="clas_MA_MAD" model="biotex.classifier">
+        <field name="code">MAD</field><field name="name">Madera y Melamina</field>
+        <field name="group_id" ref="group_MA"/><field name="status">active</field>
+    </record>
+    <record id="clas_MA_MET" model="biotex.classifier">
+        <field name="code">MET</field><field name="name">Metal Comun</field>
+        <field name="group_id" ref="group_MA"/><field name="status">active</field>
+    </record>
+    <record id="clas_MA_PLA" model="biotex.classifier">
+        <field name="code">PLA</field><field name="name">Plasticos y Polimeros</field>
+        <field name="group_id" ref="group_MA"/><field name="status">active</field>
+    </record>
+    <record id="clas_MA_TAP" model="biotex.classifier">
+        <field name="code">TAP</field><field name="name">Tapizados</field>
+        <field name="group_id" ref="group_MA"/><field name="status">active</field>
+    </record>
+    <record id="clas_CN_PES" model="biotex.classifier">
+        <field name="code">PES</field><field name="name">Equipo Pesado / Linea Blanca</field>
+        <field name="group_id" ref="group_CN"/><field name="status">active</field>
+    </record>
+    <record id="clas_CN_DEB" model="biotex.classifier">
+        <field name="code">DEB</field><field name="name">Dispositivos de Mesa / Electricos</field>
+        <field name="group_id" ref="group_CN"/><field name="status">active</field>
+    </record>
+    <record id="clas_CN_FRA" model="biotex.classifier">
+        <field name="code">FRA</field><field name="name">Material Fragil / Vajilla</field>
+        <field name="group_id" ref="group_CN"/><field name="status">active</field>
+    </record>
+    <record id="clas_CN_INO" model="biotex.classifier">
+        <field name="code">INO</field><field name="name">Acero Inoxidable Liso</field>
+        <field name="group_id" ref="group_CN"/><field name="status">active</field>
+    </record>
+    <record id="clas_RF_MEC" model="biotex.classifier">
+        <field name="code">MEC</field><field name="name">Componentes Mecanicos</field>
+        <field name="group_id" ref="group_RF"/><field name="status">active</field>
+    </record>
+    <record id="clas_RF_ELE" model="biotex.classifier">
+        <field name="code">ELE</field><field name="name">Componentes Electricos y Electronicos</field>
+        <field name="group_id" ref="group_RF"/><field name="status">active</field>
+    </record>
+    <record id="clas_RF_HID" model="biotex.classifier">
+        <field name="code">HID</field><field name="name">Componentes Hidraulicos y Neumaticos</field>
+        <field name="group_id" ref="group_RF"/><field name="status">active</field>
+    </record>
+    <record id="clas_RF_EST" model="biotex.classifier">
+        <field name="code">EST</field><field name="name">Componentes Estructurales y Carcasas</field>
+        <field name="group_id" ref="group_RF"/><field name="status">active</field>
+    </record>
+    <record id="clas_EM_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Generico / por Definir</field>
+        <field name="group_id" ref="group_EM"/><field name="status">pending</field>
+    </record>
+    <record id="clas_EM_PED" model="biotex.classifier">
+        <field name="code">PED</field><field name="name">Pediatrica</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_EM_ADU" model="biotex.classifier">
+        <field name="code">ADU</field><field name="name">Adulto</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_EM_BAR" model="biotex.classifier">
+        <field name="code">BAR</field><field name="name">Bariatrica</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_EM_LAB" model="biotex.classifier">
+        <field name="code">LAB</field><field name="name">Laboratorio</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_EM_IND" model="biotex.classifier">
+        <field name="code">IND</field><field name="name">Industrial</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_EM_COC" model="biotex.classifier">
+        <field name="code">COC</field><field name="name">Cocina</field>
+        <field name="group_id" ref="group_EM"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_OR_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Generico / por Definir</field>
+        <field name="group_id" ref="group_OR"/><field name="status">pending</field>
+    </record>
+    <record id="clas_AE_GEN" model="biotex.classifier">
+        <field name="code">GEN</field><field name="name">Generico / por Definir</field>
+        <field name="group_id" ref="group_AE"/><field name="status">pending</field>
+    </record>
+    <record id="clas_MC_MAS" model="biotex.classifier">
+        <field name="code">MAS</field><field name="name">Mascarillas de oxígeno y nebulización</field><field name="group_id" ref="group_MC"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_MC_NEB" model="biotex.classifier">
+        <field name="code">NEB</field><field name="name">Nebulizadores</field><field name="group_id" ref="group_MC"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_MC_CIR" model="biotex.classifier">
+        <field name="code">CIR</field><field name="name">Circuitos y humidificación</field><field name="group_id" ref="group_MC"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_MC_RES" model="biotex.classifier">
+        <field name="code">RES</field><field name="name">Resucitadores manuales</field><field name="group_id" ref="group_MC"/><field name="status">proposed</field>
+    </record>
+    <record id="clas_MC_SEN" model="biotex.classifier">
+        <field name="code">SEN</field><field name="name">Sensores de monitoreo</field><field name="group_id" ref="group_MC"/><field name="status">proposed</field>
+    </record>
+    <record id="family_CE_EDO" model="product.category">
+        <field name="name">Electrodos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CE"/><field name="biotex_code">EDO</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CE_EKG'), ref('clas_CE_ESG'), ref('clas_CE_EMG'), ref('clas_CE_EST'), ref('clas_CE_DEA'), ref('clas_CE_MPP'), ref('clas_CE_EEG')])]"/>
+    </record>
+    <record id="family_CE_FLT" model="product.category">
+        <field name="name">Filtros</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CE"/><field name="biotex_code">FLT</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CE_GEN')])]"/>
+    </record>
+    <record id="family_CE_CBL" model="product.category">
+        <field name="name">Cables</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CE"/><field name="biotex_code">CBL</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CE_EKG'), ref('clas_CE_EMG'), ref('clas_CE_EEG'), ref('clas_CE_GEN')])]"/>
+    </record>
+    <record id="family_CE_INF" model="product.category">
+        <field name="name">Equipos de Infusion para Bomba</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CE"/><field name="biotex_code">INF</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1 - absorbe MC-IST-EQB</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CE_BIN')])]"/>
+    </record>
+    <record id="family_MC_TEX" model="product.category">
+        <field name="name">Textiles y Materiales de Cobertura</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">TEX</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_GAS'), ref('clas_MC_VEN'), ref('clas_MC_APO'), ref('clas_MC_ALG'), ref('clas_MC_COM')])]"/>
+    </record>
+    <record id="family_MC_ADH" model="product.category">
+        <field name="name">Fijacion, Sujecion y Adhesivos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">ADH</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_CIN'), ref('clas_MC_TEL'), ref('clas_MC_TEG')])]"/>
+    </record>
+    <record id="family_MC_PUN" model="product.category">
+        <field name="name">Dispositivos de Inyeccion, Puncion E Infusion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">PUN</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_JER'), ref('clas_MC_AGU'), ref('clas_MC_CAT'), ref('clas_MC_LLA'), ref('clas_MC_EXT')])]"/>
+    </record>
+    <record id="family_MC_SND" model="product.category">
+        <field name="name">Sondas, Tubos y Canulas</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">SND</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1 - unifica IST / EIB / SND</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_SON'), ref('clas_MC_TUB'), ref('clas_MC_CAN'), ref('clas_MC_DRE')])]"/>
+    </record>
+    <record id="family_MC_SUT" model="product.category">
+        <field name="name">Suturas y Cierre de Heridas</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">SUT</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_ABS'), ref('clas_MC_NAB'), ref('clas_MC_GRP'), ref('clas_MC_PEG')])]"/>
+    </record>
+    <record id="family_MC_PRO" model="product.category">
+        <field name="name">Ropa y Proteccion Quirurgica Desechable</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">PRO</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_GUA'), ref('clas_MC_CUB'), ref('clas_MC_BAT'), ref('clas_MC_BUL'), ref('clas_MC_GOR')])]"/>
+    </record>
+    <record id="family_MC_ANT" model="product.category">
+        <field name="name">Soluciones Antisepticas y Hemostaticos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">ANT</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_SOL'), ref('clas_MC_HEM')])]"/>
+    </record>
+    <record id="family_MC_LUB" model="product.category">
+        <field name="name">Lubricantes y Geles de Contacto</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">LUB</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_CHU'), ref('clas_MC_GEN')])]"/>
+    </record>
+    <record id="family_MT_SID" model="product.category">
+        <field name="name">Sistema Infeccioso y Defensas</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">SID</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_DIA" model="product.category">
+        <field name="name">Dolor, Inflamacion y Alergias</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">DIA</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_SCS" model="product.category">
+        <field name="name">Sistema Cardiovascular y Sangre</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">SCS</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_SDM" model="product.category">
+        <field name="name">Sistema Digestivo y Metabolismo</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">SDM</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1 - corrige SCS duplicado</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_SNP" model="product.category">
+        <field name="name">Sistema Nervioso y Psiquiatria</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">SNP</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_SRE" model="product.category">
+        <field name="name">Sistema Respiratorio</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">SRE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_NUT" model="product.category">
+        <field name="name">Nutricion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">NUT</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_MT_ONC" model="product.category">
+        <field name="name">Oncologico</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MT"/><field name="biotex_code">ONC</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">v1</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MT_TAB'), ref('clas_MT_CAP'), ref('clas_MT_POL'), ref('clas_MT_GRA'), ref('clas_MT_SUS'), ref('clas_MT_JAR'), ref('clas_MT_AMP'), ref('clas_MT_EMU'), ref('clas_MT_ELX'), ref('clas_MT_GTT'), ref('clas_MT_CRE'), ref('clas_MT_UNG'), ref('clas_MT_GEL'), ref('clas_MT_PAS'), ref('clas_MT_AER'), ref('clas_MT_ESM'), ref('clas_MT_PAR')])]"/>
+    </record>
+    <record id="family_IN_DIE" model="product.category">
+        <field name="name">Dieresis y Corte</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">DIE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_IN_HEM" model="product.category">
+        <field name="name">Hemostasia</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">HEM</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_IN_PRE" model="product.category">
+        <field name="name">Prension y Aprehension</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">PRE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_IN_EXP" model="product.category">
+        <field name="name">Exposicion o Separacion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">EXP</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_IN_SIN" model="product.category">
+        <field name="name">Sintesis o Sutura</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">SIN</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_IN_ASE" model="product.category">
+        <field name="name">Aspiracion y Exploracion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_IN"/><field name="biotex_code">ASE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_IN_GEN'), ref('clas_IN_GIN'), ref('clas_IN_ORT'), ref('clas_IN_OPH'), ref('clas_IN_ENT'), ref('clas_IN_URO'), ref('clas_IN_NEU'), ref('clas_IN_CVR'), ref('clas_IN_PED')])]"/>
+    </record>
+    <record id="family_EM_SIV" model="product.category">
+        <field name="name">Monitoreo de Signos Vitales</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">SIV</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_SUL" model="product.category">
+        <field name="name">Soporte de Vida</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">SUL</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_IMA" model="product.category">
+        <field name="name">Imagenologia y Diagnostico</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">IMA</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - venia duplicada en dos bloques</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_TER" model="product.category">
+        <field name="name">Terapia y Rehabilitacion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">TER</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_CIR" model="product.category">
+        <field name="name">Equipos de Quirofano y Cirugia</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">CIR</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_LAB" model="product.category">
+        <field name="name">Laboratorio Clinico</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">LAB</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - venia duplicada en dos bloques</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_STE" model="product.category">
+        <field name="name">Esterilizacion y Limpieza</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">STE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_EST" model="product.category">
+        <field name="name">Estetica y Dermatologia</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">EST</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN')])]"/>
+    </record>
+    <record id="family_EM_BAS" model="product.category">
+        <field name="name">Basculas</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_EM"/><field name="biotex_code">BAS</field>
+        <field name="biotex_status">pending</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1 huerfana: el bloque nuevo de EM ya no la incluye. Candidata a absorberse en SIV.</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_EM_GEN'), ref('clas_EM_PED'), ref('clas_EM_ADU'), ref('clas_EM_BAR'), ref('clas_EM_LAB'), ref('clas_EM_IND'), ref('clas_EM_COC')])]"/>
+    </record>
+    <record id="family_OR_MOV" model="product.category">
+        <field name="name">Mobiliario de Movilidad y Traslado</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_OR"/><field name="biotex_code">MOV</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - absorbe la silla de ruedas de MM-SYB</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_OR_GEN')])]"/>
+    </record>
+    <record id="family_OR_BLA" model="product.category">
+        <field name="name">Ortopedia Blanda</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_OR"/><field name="biotex_code">BLA</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_OR_GEN')])]"/>
+    </record>
+    <record id="family_OR_IMP" model="product.category">
+        <field name="name">Implantes</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_OR"/><field name="biotex_code">IMP</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_OR_GEN')])]"/>
+    </record>
+    <record id="family_MM_PAC" model="product.category">
+        <field name="name">Mobiliario de Descanso y Hospitalizacion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">PAC</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MM_EXP" model="product.category">
+        <field name="name">Mobiliario de Exploracion y Procedimientos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">EXP</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MM_QUI" model="product.category">
+        <field name="name">Mobiliario de Quirofano y Ceye</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">QUI</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MM_SUP" model="product.category">
+        <field name="name">Mobiliario de Soporte E Insumos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">SUP</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MM_SEC" model="product.category">
+        <field name="name">Mobiliario Clinico Secundario</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">SEC</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MM_SYB" model="product.category">
+        <field name="name">Sillas y Bancos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MM"/><field name="biotex_code">SYB</field>
+        <field name="biotex_status">pending</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">v1 huerfana: silla de ruedas migra a OR-MOV, bancos a MM-SEC. Confirmar y dar de baja.</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MM_INO'), ref('clas_MM_TUB'), ref('clas_MM_TAP'), ref('clas_MM_MIX')])]"/>
+    </record>
+    <record id="family_MA_OFI" model="product.category">
+        <field name="name">Mobiliario de Oficina y Operaciones</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MA"/><field name="biotex_code">OFI</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MA_MAD'), ref('clas_MA_MET'), ref('clas_MA_PLA'), ref('clas_MA_TAP')])]"/>
+    </record>
+    <record id="family_MA_SIS" model="product.category">
+        <field name="name">Sillas y Asientos</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MA"/><field name="biotex_code">SIS</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MA_MAD'), ref('clas_MA_MET'), ref('clas_MA_PLA'), ref('clas_MA_TAP')])]"/>
+    </record>
+    <record id="family_MA_ARC" model="product.category">
+        <field name="name">Mobiliario de Archivo y Resguardo</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MA"/><field name="biotex_code">ARC</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MA_MAD'), ref('clas_MA_MET'), ref('clas_MA_PLA'), ref('clas_MA_TAP')])]"/>
+    </record>
+    <record id="family_CN_COC" model="product.category">
+        <field name="name">Sistemas de Coccion y Calor</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CN"/><field name="biotex_code">COC</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CN_PES'), ref('clas_CN_DEB'), ref('clas_CN_FRA'), ref('clas_CN_INO')])]"/>
+    </record>
+    <record id="family_CN_PRE" model="product.category">
+        <field name="name">Preparacion y Procesamiento</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CN"/><field name="biotex_code">PRE</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - venia con espacio inicial</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CN_PES'), ref('clas_CN_DEB'), ref('clas_CN_FRA'), ref('clas_CN_INO')])]"/>
+    </record>
+    <record id="family_CN_SER" model="product.category">
+        <field name="name">Servicio y Distribucion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CN"/><field name="biotex_code">SER</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - venia con espacio inicial</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CN_PES'), ref('clas_CN_DEB'), ref('clas_CN_FRA'), ref('clas_CN_INO')])]"/>
+    </record>
+    <record id="family_CN_ALM" model="product.category">
+        <field name="name">Almacenamiento y Conservacion</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CN"/><field name="biotex_code">ALM</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CN_PES'), ref('clas_CN_DEB'), ref('clas_CN_FRA'), ref('clas_CN_INO')])]"/>
+    </record>
+    <record id="family_CN_HIG" model="product.category">
+        <field name="name">Higiene y Limpieza</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CN"/><field name="biotex_code">HIG</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - venia con espacio inicial</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CN_PES'), ref('clas_CN_DEB'), ref('clas_CN_FRA'), ref('clas_CN_INO')])]"/>
+    </record>
+    <record id="family_RF_EMM" model="product.category">
+        <field name="name">Refaccion de Equipo Medico</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_RF"/><field name="biotex_code">EMM</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2 - ver incidencia: replica el nivel GRUPO</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_RF_MEC'), ref('clas_RF_ELE'), ref('clas_RF_HID'), ref('clas_RF_EST')])]"/>
+    </record>
+    <record id="family_RF_MMM" model="product.category">
+        <field name="name">Refaccion de Mobiliario Medico</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_RF"/><field name="biotex_code">MMM</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_RF_MEC'), ref('clas_RF_ELE'), ref('clas_RF_HID'), ref('clas_RF_EST')])]"/>
+    </record>
+    <record id="family_RF_MAA" model="product.category">
+        <field name="name">Refaccion de Mobiliario Administrativo</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_RF"/><field name="biotex_code">MAA</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_RF_MEC'), ref('clas_RF_ELE'), ref('clas_RF_HID'), ref('clas_RF_EST')])]"/>
+    </record>
+    <record id="family_RF_CNN" model="product.category">
+        <field name="name">Refaccion de Cocina y Comedor</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_RF"/><field name="biotex_code">CNN</field>
+        <field name="biotex_status">active</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">NUEVO v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_RF_MEC'), ref('clas_RF_ELE'), ref('clas_RF_HID'), ref('clas_RF_EST')])]"/>
+    </record>
+    <record id="family_MC_OXI" model="product.category">
+        <field name="name">Oxigenoterapia E Inhaloterapia</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_MC"/><field name="biotex_code">OXI</field>
+        <field name="biotex_status">proposed</field><field name="biotex_photo_required" eval="False"/>
+        <field name="biotex_origin">Propuesta Alphaqueb: la línea de mayor volumen no tenía familia en el esquema v2</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_MC_MAS'), ref('clas_MC_NEB'), ref('clas_MC_CIR'), ref('clas_MC_RES'), ref('clas_MC_CAN'), ref('clas_MC_TUB'), ref('clas_MC_SON'), ref('clas_MC_GEN')])]"/>
+    </record>
+    <record id="family_CE_SEN" model="product.category">
+        <field name="name">Sensores y Transductores</field><field name="parent_id" ref="product.product_category_goods"/>
+        <field name="biotex_group_id" ref="group_CE"/><field name="biotex_code">SEN</field>
+        <field name="biotex_status">proposed</field><field name="biotex_photo_required" eval="True"/>
+        <field name="biotex_origin">Propuesta Alphaqueb: sensores SpO2 y temperatura no tenían familia en CE</field>
+        <field name="biotex_classifier_ids" eval="[(6, 0, [ref('clas_CE_EKG'), ref('clas_CE_BIN'), ref('clas_CE_GEN')])]"/>
+    </record>
+    <record id="brand_LGMD" model="biotex.brand">
+        <field name="name">LGMD</field><field name="code">LGMD</field>
+    </record>
+    <record id="brand_MDEL" model="biotex.brand">
+        <field name="name">Medico Electrodes</field><field name="code">MDEL</field>
+    </record>
+    <record id="brand_TECH" model="biotex.brand">
+        <field name="name">Technomed</field><field name="code">TECH</field>
+    </record>
+    <record id="brand_3M3M" model="biotex.brand">
+        <field name="name">3M</field><field name="code">3M3M</field>
+    </record>
+    <record id="brand_DSTK" model="biotex.brand">
+        <field name="name">Dura-Stick</field><field name="code">DSTK</field>
+    </record>
+    <record id="brand_KDLL" model="biotex.brand">
+        <field name="name">Kendall</field><field name="code">KDLL</field>
+    </record>
+    <record id="brand_OLMP" model="biotex.brand">
+        <field name="name">Olympus</field><field name="code">OLMP</field>
+    </record>
+    <record id="brand_CONM" model="biotex.brand">
+        <field name="name">Conmed</field><field name="code">CONM</field>
+    </record>
+    <record id="brand_BMHH" model="biotex.brand">
+        <field name="name">BMH</field><field name="code">BMHH</field>
+    </record>
+    <record id="brand_LESA" model="biotex.brand">
+        <field name="name">Lessa</field><field name="code">LESA</field>
+    </record>
+    <record id="brand_BTLL" model="biotex.brand">
+        <field name="name">BTL</field><field name="code">BTLL</field>
+    </record>
+    <record id="brand_AMBU" model="biotex.brand">
+        <field name="name">Ambu</field><field name="code">AMBU</field>
+    </record>
+    <record id="brand_TCNS" model="biotex.brand">
+        <field name="name">Tecnhos</field><field name="code">TCNS</field>
+    </record>
+    <record id="brand_CHAT" model="biotex.brand">
+        <field name="name">Chattanooga</field><field name="code">CHAT</field>
+    </record>
+    <record id="brand_AROW" model="biotex.brand">
+        <field name="name">Arrow</field><field name="code">AROW</field>
+    </record>
+    <record id="brand_BARD" model="biotex.brand">
+        <field name="name">Bard</field><field name="code">BARD</field>
+    </record>
+    <record id="brand_ALTM" model="biotex.brand">
+        <field name="name">Altamirano</field><field name="code">ALTM</field>
+    </record>
+    <record id="spec_CGE" model="biotex.specialty"><field name="code">CGE</field><field name="name">Cirugia General</field></record>
+    <record id="spec_GIN" model="biotex.specialty"><field name="code">GIN</field><field name="name">Ginecologia</field></record>
+    <record id="spec_GBS" model="biotex.specialty"><field name="code">GBS</field><field name="name">Ginecobstetricia</field></record>
+    <record id="spec_URO" model="biotex.specialty"><field name="code">URO</field><field name="name">Urologia</field></record>
+    <record id="spec_CAR" model="biotex.specialty"><field name="code">CAR</field><field name="name">Cardiologia</field></record>
+    <record id="spec_MIN" model="biotex.specialty"><field name="code">MIN</field><field name="name">Medicina Interna</field></record>
+    <record id="spec_MGE" model="biotex.specialty"><field name="code">MGE</field><field name="name">Medicina General</field></record>
+    <record id="spec_HOS" model="biotex.specialty"><field name="code">HOS</field><field name="name">Hospitalizacion</field></record>
+    <record id="spec_URG" model="biotex.specialty"><field name="code">URG</field><field name="name">Urgencias</field></record>
+    <record id="spec_MFR" model="biotex.specialty"><field name="code">MFR</field><field name="name">Medicina Fisica y Rehabilitacion</field></record>
+    <record id="spec_NEU" model="biotex.specialty"><field name="code">NEU</field><field name="name">Neurologia</field></record>
+    <record id="spec_NFI" model="biotex.specialty"><field name="code">NFI</field><field name="name">Neurofisiologia</field></record>
+    <record id="spec_CSU" model="biotex.specialty"><field name="code">CSU</field><field name="name">Clinica del Sueno</field></record>
+    <record id="spec_NEO" model="biotex.specialty"><field name="code">NEO</field><field name="name">Neonatologia</field></record>
+    <record id="spec_ORL" model="biotex.specialty"><field name="code">ORL</field><field name="name">Otorrinolaringologia</field></record>
+    <record id="spec_TOD" model="biotex.specialty"><field name="code">TOD</field><field name="name">Aplica a Todas Las Especialidades</field></record>
+    <record id="spec_SAS" model="biotex.specialty"><field name="code">SAS</field><field name="name">Sin Asignar</field></record>
+    <record id="equip_EQ_ECG" model="biotex.equipment"><field name="code">EQ-ECG</field><field name="name">Electrocardiografo</field></record>
+    <record id="equip_EQ_MON" model="biotex.equipment"><field name="code">EQ-MON</field><field name="name">Monitor de Signos Vitales</field></record>
+    <record id="equip_EQ_EMG" model="biotex.equipment"><field name="code">EQ-EMG</field><field name="name">Electromiografo</field></record>
+    <record id="equip_EQ_EES" model="biotex.equipment"><field name="code">EQ-EES</field><field name="name">Electroestimulador / Tens</field></record>
+    <record id="equip_EQ_UEC" model="biotex.equipment"><field name="code">EQ-UEC</field><field name="name">Unidad de Electrocirugia</field></record>
+    <record id="equip_EQ_ESG" model="biotex.equipment"><field name="code">EQ-ESG</field><field name="name">Electrocauterio Olympus Esg 400/410</field></record>
+    <record id="equip_EQ_DEA" model="biotex.equipment"><field name="code">EQ-DEA</field><field name="name">Desfibrilador</field></record>
+    <record id="equip_EQ_MPP" model="biotex.equipment"><field name="code">EQ-MPP</field><field name="name">Marcapasos</field></record>
+    <record id="equip_EQ_EEG" model="biotex.equipment"><field name="code">EQ-EEG</field><field name="name">Electroencefalografo</field></record>
+    <record id="equip_EQ_NIN" model="biotex.equipment"><field name="code">EQ-NIN</field><field name="name">Sin Equipo Relacionado</field></record>
+    <record id="equip_EQ_SAS" model="biotex.equipment"><field name="code">EQ-SAS</field><field name="name">Sin Asignar</field></record>
+    <record id="subclass_SID_ANB" model="biotex.mt.subclass">
+        <field name="code">ANB</field><field name="name">Antibioticos</field><field name="family_id" ref="family_MT_SID"/>
+    </record>
+    <record id="subclass_SID_ANV" model="biotex.mt.subclass">
+        <field name="code">ANV</field><field name="name">Antivirales</field><field name="family_id" ref="family_MT_SID"/>
+    </record>
+    <record id="subclass_SID_ANM" model="biotex.mt.subclass">
+        <field name="code">ANM</field><field name="name">Antimicoticos</field><field name="family_id" ref="family_MT_SID"/>
+    </record>
+    <record id="subclass_SID_ANP" model="biotex.mt.subclass">
+        <field name="code">ANP</field><field name="name">Antiparasitarios</field><field name="family_id" ref="family_MT_SID"/>
+    </record>
+    <record id="subclass_DIA_ALG" model="biotex.mt.subclass">
+        <field name="code">ALG</field><field name="name">Analgesicos</field><field name="family_id" ref="family_MT_DIA"/>
+    </record>
+    <record id="subclass_DIA_AIN" model="biotex.mt.subclass">
+        <field name="code">AIN</field><field name="name">Antiinflamatorios / Aines</field><field name="family_id" ref="family_MT_DIA"/>
+    </record>
+    <record id="subclass_DIA_ANE" model="biotex.mt.subclass">
+        <field name="code">ANE</field><field name="name">Anestesicos</field><field name="family_id" ref="family_MT_DIA"/>
+    </record>
+    <record id="subclass_DIA_ALR" model="biotex.mt.subclass">
+        <field name="code">ALR</field><field name="name">Antihistaminicos</field><field name="family_id" ref="family_MT_DIA"/>
+    </record>
+    <record id="subclass_DIA_COR" model="biotex.mt.subclass">
+        <field name="code">COR</field><field name="name">Corticoides</field><field name="family_id" ref="family_MT_DIA"/>
+    </record>
+    <record id="subclass_SCS_HTN" model="biotex.mt.subclass">
+        <field name="code">HTN</field><field name="name">Antihipertensivos</field><field name="family_id" ref="family_MT_SCS"/>
+    </record>
+    <record id="subclass_SCS_ACO" model="biotex.mt.subclass">
+        <field name="code">ACO</field><field name="name">Anticoagulantes</field><field name="family_id" ref="family_MT_SCS"/>
+    </record>
+    <record id="subclass_SCS_LIP" model="biotex.mt.subclass">
+        <field name="code">LIP</field><field name="name">Hipolipemiantes</field><field name="family_id" ref="family_MT_SCS"/>
+    </record>
+    <record id="subclass_SDM_GAS" model="biotex.mt.subclass">
+        <field name="code">GAS</field><field name="name">Antiacidos y Antiulcerosos</field><field name="family_id" ref="family_MT_SDM"/>
+    </record>
+    <record id="subclass_SDM_MET" model="biotex.mt.subclass">
+        <field name="code">MET</field><field name="name">Antidiabeticos</field><field name="family_id" ref="family_MT_SDM"/>
+    </record>
+    <record id="subclass_SDM_EME" model="biotex.mt.subclass">
+        <field name="code">EME</field><field name="name">Antiemeticos</field><field name="family_id" ref="family_MT_SDM"/>
+    </record>
+    <record id="subclass_SDM_LAX" model="biotex.mt.subclass">
+        <field name="code">LAX</field><field name="name">Laxantes</field><field name="family_id" ref="family_MT_SDM"/>
+    </record>
+    <record id="subclass_SNP_ANX" model="biotex.mt.subclass">
+        <field name="code">ANX</field><field name="name">Ansioliticos / Sedantes</field><field name="family_id" ref="family_MT_SNP"/>
+    </record>
+    <record id="subclass_SNP_ADE" model="biotex.mt.subclass">
+        <field name="code">ADE</field><field name="name">Antidepresivos</field><field name="family_id" ref="family_MT_SNP"/>
+    </record>
+    <record id="subclass_SNP_ANC" model="biotex.mt.subclass">
+        <field name="code">ANC</field><field name="name">Anticonvulsivos</field><field name="family_id" ref="family_MT_SNP"/>
+    </record>
+    <record id="subclass_SRE_BRO" model="biotex.mt.subclass">
+        <field name="code">BRO</field><field name="name">Broncodilatadores</field><field name="family_id" ref="family_MT_SRE"/>
+    </record>
+    <record id="subclass_SRE_MUC" model="biotex.mt.subclass">
+        <field name="code">MUC</field><field name="name">Mucoliticos y Expectorantes</field><field name="family_id" ref="family_MT_SRE"/>
+    </record>
+</odoo>

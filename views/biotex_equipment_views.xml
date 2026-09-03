@@ -5,9 +5,11 @@
         <field name="model">biotex.equipment</field>
         <field name="arch" type="xml">
             <list editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
                 <field name="brand_id"/>
                 <field name="model"/>
-                <field name="equipment_type"/>
+                <field name="parent_id"/>
                 <field name="product_ids" widget="many2many_tags" optional="show"/>
             </list>
         </field>
@@ -22,9 +24,11 @@
                     <field name="image" widget="image" class="oe_avatar"/>
                     <group>
                         <group>
+                            <field name="code"/>
+                            <field name="name"/>
                             <field name="brand_id"/>
                             <field name="model"/>
-                            <field name="equipment_type"/>
+                            <field name="parent_id"/>
                         </group>
                     </group>
                     <notebook>

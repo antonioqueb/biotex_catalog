@@ -7,19 +7,26 @@ import { _t } from "@web/core/l10n/translation";
 const STEPS = [
     { key: "group", label: "Grupo" },
     { key: "family", label: "Familia" },
+    { key: "classifier", label: "Clasificador" },
+    { key: "brand", label: "Marca" },
     { key: "description", label: "Descripción" },
-    { key: "brand", label: "Marca y compatibilidad" },
+    { key: "usage", label: "Uso y origen" },
     { key: "photos", label: "Fotos" },
     { key: "review", label: "Revisión" },
 ];
 
 const EMPTY = () => ({
-    id: false, name: "", biotex_name: "", biotex_measure: "", biotex_content: "", biotex_usage_notes: "",
-    biotex_group_id: false, biotex_family_id: false, biotex_brand_id: false, biotex_model: "",
-    biotex_manufacturer_id: false, biotex_reference: "", biotex_equipment_ids: [],
+    id: false, name: "", biotex_name: "", biotex_measure: "", biotex_content: "", biotex_package_type: "", biotex_package_qty: 1,
+    biotex_usage_notes: "", biotex_group_id: false, biotex_family_id: false, biotex_classifier_id: false, biotex_brand_id: false,
+    biotex_model: "", biotex_reference: "", biotex_manufacturer_id: false, biotex_country_id: false, biotex_primary_distributor_id: false,
+    biotex_equipment_ids: [], biotex_main_equipment_id: false, biotex_specialty_ids: [], biotex_main_specialty_id: false,
     image_1920: null, biotex_image_2: null, biotex_image_3: null,
 });
 
+/**
+ * Asistente de clasificación v2. Sigue el orden de la clave GG-MMMM-FFF-CCC-NN:
+ * grupo (eje) → familia → clasificador autorizado → marca (código) → descripción → uso y origen → fotos → revisión.
+ */
 export class BiotexClassifier extends Component {
     static template = "biotex_catalog.Classifier";
     static props = ["*"];
@@ -30,81 +37,56 @@ export class BiotexClassifier extends Component {
         this.notification = useService("notification");
         this.steps = STEPS;
         this.state = useState({
-            step: 0,
-            tree: [],
-            queue: [],
-            queueIndex: 0,
-            product: EMPTY(),
-            familySearch: "",
-            brands: [],
-            brandSearch: "",
-            brandSimilar: [],
-            manufacturers: [],
-            equipments: [],
-            equipmentSearch: "",
-            saving: false,
-            done: 0,
-            hasChanges: false,
+            step: 0, tree: [], queue: [], queueIndex: 0, product: EMPTY(), familySearch: "", classifierSearch: "",
+            brands: [], brandSearch: "", brandSimilar: [], newBrandCode: "", manufacturers: [], manufacturerName: "",
+            distributors: [], distributorName: "", countries: [], countryName: "", equipments: [], equipmentSearch: "", equipmentLabels: {},
+            specialties: [], preview: { clave: "", generic: "" }, saving: false, done: 0,
         });
         onWillStart(async () => {
             const ctx = this.props.action?.context || {};
-            const [tree, queue, brands] = await Promise.all([
+            const [tree, queue, brands, specialties, countries] = await Promise.all([
                 this.orm.call("product.category", "biotex_get_tree", []),
                 this.orm.call("product.template", "biotex_classifier_queue", [ctx.biotex_product_ids || null]),
-                this.orm.searchRead("biotex.brand", [], ["id", "name"], { limit: 500, order: "name" }),
+                this.orm.searchRead("biotex.brand", [], ["id", "name", "code"], { limit: 1000, order: "name" }),
+                this.orm.searchRead("biotex.specialty", [], ["id", "name", "code"], { order: "name" }),
+                this.orm.searchRead("res.country", [], ["id", "name"], { order: "name" }),
             ]);
-            this.state.tree = tree;
-            this.state.queue = queue;
-            this.state.brands = brands;
+            Object.assign(this.state, { tree, queue, brands, specialties, countries });
             this.loadCurrent();
         });
     }
 
     // ------------------------------------------------------------ cola
     get current() { return this.state.queue[this.state.queueIndex]; }
-    get progress() {
-        return this.state.queue.length ? Math.round((this.state.done / this.state.queue.length) * 100) : 0;
-    }
+    get progress() { return this.state.queue.length ? Math.round((this.state.done / this.state.queue.length) * 100) : 0; }
+    m2o(v) { return v ? v[0] : false; }
     loadCurrent() {
         const p = this.current;
         const prod = EMPTY();
         if (p) {
             Object.assign(prod, {
-                id: p.id, name: p.name, biotex_name: p.biotex_name || "", biotex_measure: p.biotex_measure || "",
-                biotex_content: p.biotex_content || "", biotex_usage_notes: p.biotex_usage_notes || "",
-                biotex_group_id: p.biotex_group_id ? p.biotex_group_id[0] : false,
-                biotex_family_id: p.biotex_family_id ? p.biotex_family_id[0] : false,
-                biotex_brand_id: p.biotex_brand_id ? p.biotex_brand_id[0] : false,
-                biotex_model: p.biotex_model || "", biotex_reference: p.biotex_reference || "",
-                biotex_manufacturer_id: p.biotex_manufacturer_id ? p.biotex_manufacturer_id[0] : false,
-                biotex_equipment_ids: p.biotex_equipment_ids || [],
-                image_128: p.image_128, existingPhotos: p.biotex_photo_count || 0, description: p.description,
+                id: p.id, name: p.name, biotex_name: p.biotex_name || p.name || "", biotex_measure: p.biotex_measure || "", biotex_content: p.biotex_content || "",
+                biotex_package_type: p.biotex_package_type || "", biotex_package_qty: p.biotex_package_qty || 1, biotex_usage_notes: p.biotex_usage_notes || "",
+                biotex_group_id: this.m2o(p.biotex_group_id), biotex_family_id: this.m2o(p.biotex_family_id), biotex_classifier_id: this.m2o(p.biotex_classifier_id),
+                biotex_brand_id: this.m2o(p.biotex_brand_id), biotex_model: p.biotex_model || "", biotex_reference: p.biotex_reference || "",
+                biotex_manufacturer_id: this.m2o(p.biotex_manufacturer_id), biotex_country_id: this.m2o(p.biotex_country_id), biotex_primary_distributor_id: this.m2o(p.biotex_primary_distributor_id),
+                biotex_equipment_ids: p.biotex_equipment_ids || [], biotex_main_equipment_id: this.m2o(p.biotex_main_equipment_id),
+                biotex_specialty_ids: p.biotex_specialty_ids || [], biotex_main_specialty_id: this.m2o(p.biotex_main_specialty_id),
+                image_128: p.image_128, existingPhotos: p.biotex_photo_count || 0, description: p.description, legacy: p.biotex_legacy_code,
             });
-            // si no tiene nombre base, sugerir el nombre actual como punto de partida
-            if (!prod.biotex_name && p.name) prod.biotex_name = p.name;
+            this.state.manufacturerName = p.biotex_manufacturer_id ? p.biotex_manufacturer_id[1] : "";
+            this.state.distributorName = p.biotex_primary_distributor_id ? p.biotex_primary_distributor_id[1] : "";
+            this.state.countryName = p.biotex_country_id ? p.biotex_country_id[1] : "";
+            if (p.biotex_main_equipment_id) this.state.equipmentLabels[p.biotex_main_equipment_id[0]] = p.biotex_main_equipment_id[1];
         }
         this.state.product = prod;
         this.state.step = 0;
-        this.state.hasChanges = false;
-        this.state.familySearch = "";
+        this.state.familySearch = this.state.classifierSearch = "";
+        this.state.preview = { clave: "", generic: "" };
     }
-    newProduct() {
-        this.state.queue.splice(this.state.queueIndex + 1, 0, { id: false, name: _t("Nuevo producto") });
-        this.state.queueIndex += 1;
-        this.loadCurrent();
-    }
-    skip() {
-        if (this.state.queueIndex < this.state.queue.length - 1) {
-            this.state.queueIndex += 1;
-            this.loadCurrent();
-        }
-    }
-    previous() {
-        if (this.state.queueIndex > 0) {
-            this.state.queueIndex -= 1;
-            this.loadCurrent();
-        }
-    }
+    newProduct() { this.state.queue.splice(this.state.queueIndex + 1, 0, { id: false, name: _t("Nuevo producto") }); this.state.queueIndex += 1; this.loadCurrent(); }
+    skip() { if (this.state.queueIndex < this.state.queue.length - 1) { this.state.queueIndex += 1; this.loadCurrent(); } }
+    previous() { if (this.state.queueIndex > 0) { this.state.queueIndex -= 1; this.loadCurrent(); } }
 
     // ------------------------------------------------------------ pasos
     get stepKey() { return STEPS[this.state.step].key; }
@@ -114,165 +96,143 @@ export class BiotexClassifier extends Component {
         switch (STEPS[i].key) {
             case "group": return !!p.biotex_group_id;
             case "family": return !!p.biotex_family_id;
-            case "description": return !!p.biotex_name && !!p.biotex_measure;
+            case "classifier": return !!p.biotex_classifier_id;
             case "brand": return !!p.biotex_brand_id;
+            case "description": return !!p.biotex_name && !!p.biotex_measure && !!p.biotex_content;
             default: return true;
         }
     }
-    goTo(i) { if (this.canGo(i)) this.state.step = i; }
+    goTo(i) { if (this.canGo(i)) { this.state.step = i; if (STEPS[i].key === "review") this.refreshPreview(); } }
     next() {
-        if (!this.stepValid(this.state.step)) {
-            this.notification.add(_t("Complete los campos obligatorios de este paso."), { type: "warning" });
-            return;
-        }
-        if (this.state.step < STEPS.length - 1) this.state.step += 1;
+        if (!this.stepValid(this.state.step)) { this.notification.add(_t("Complete los campos obligatorios de este paso."), { type: "warning" }); return; }
+        if (this.state.step < STEPS.length - 1) { this.state.step += 1; if (this.stepKey === "review") this.refreshPreview(); }
     }
     back() { if (this.state.step > 0) this.state.step -= 1; }
+    onInput(field, ev) { this.state.product[field] = ev.target.value; }
 
-    // ------------------------------------------------------------ grupo / familia
+    // ------------------------------------------------------------ grupo / familia / clasificador
     get group() { return this.state.tree.find((g) => g.id === this.state.product.biotex_group_id); }
     get families() {
-        const g = this.group;
-        if (!g) return [];
+        const g = this.group; if (!g) return [];
         const q = this.state.familySearch.toLowerCase();
         return g.families.filter((f) => !q || f.name.toLowerCase().includes(q) || (f.code || "").toLowerCase().includes(q));
     }
     get family() { return this.group?.families.find((f) => f.id === this.state.product.biotex_family_id); }
-    selectGroup(g) {
-        this.state.product.biotex_group_id = g.id;
-        this.state.product.biotex_family_id = false;
-        this.state.hasChanges = true;
-        this.state.step = 1;
+    get classifiers() {
+        const f = this.family; if (!f) return [];
+        const q = this.state.classifierSearch.toLowerCase();
+        return f.classifiers.filter((c) => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
     }
-    selectFamily(f) {
-        this.state.product.biotex_family_id = f.id;
-        this.state.hasChanges = true;
-        this.state.step = 2;
-    }
-
-    // ------------------------------------------------------------ descripción
-    get previewName() {
-        const p = this.state.product;
-        return [p.biotex_name, p.biotex_measure, p.biotex_content].map((x) => (x || "").trim()).filter(Boolean).join(" ");
-    }
-    onInput(field, ev) {
-        this.state.product[field] = ev.target.value;
-        this.state.hasChanges = true;
-    }
+    get classifier() { return this.family?.classifiers.find((c) => c.id === this.state.product.biotex_classifier_id); }
+    selectGroup(g) { Object.assign(this.state.product, { biotex_group_id: g.id, biotex_family_id: false, biotex_classifier_id: false }); this.state.step = 1; }
+    selectFamily(f) { Object.assign(this.state.product, { biotex_family_id: f.id, biotex_classifier_id: false }); this.state.step = 2; }
+    selectClassifier(c) { this.state.product.biotex_classifier_id = c.id; this.state.step = 3; }
 
     // ------------------------------------------------------------ marca
     get filteredBrands() {
         const q = this.state.brandSearch.toLowerCase();
-        return this.state.brands.filter((b) => !q || b.name.toLowerCase().includes(q)).slice(0, 12);
+        return this.state.brands.filter((b) => !q || b.name.toLowerCase().includes(q) || (b.code || "").toLowerCase().includes(q)).slice(0, 12);
     }
-    get brandName() {
-        const b = this.state.brands.find((b) => b.id === this.state.product.biotex_brand_id);
-        return b ? b.name : "";
-    }
+    get brand() { return this.state.brands.find((b) => b.id === this.state.product.biotex_brand_id); }
     async onBrandSearch(ev) {
         this.state.brandSearch = ev.target.value;
-        this.state.brandSimilar = this.state.brandSearch.length > 2
-            ? await this.orm.call("biotex.brand", "find_similar", [this.state.brandSearch]) : [];
+        if (this.state.brandSearch.length > 2) {
+            const [similar, code] = await Promise.all([
+                this.orm.call("biotex.brand", "find_similar", [this.state.brandSearch]),
+                this.orm.call("biotex.brand", "suggest_code", [this.state.brandSearch]),
+            ]);
+            this.state.brandSimilar = similar; this.state.newBrandCode = code;
+        } else { this.state.brandSimilar = []; this.state.newBrandCode = ""; }
     }
-    selectBrand(b) {
-        this.state.product.biotex_brand_id = b.id;
-        this.state.brandSearch = "";
-        this.state.brandSimilar = [];
-        this.state.hasChanges = true;
-    }
+    selectBrand(b) { this.state.product.biotex_brand_id = b.id; this.state.brandSearch = ""; this.state.brandSimilar = []; }
     async createBrand() {
-        const name = this.state.brandSearch.trim();
-        if (!name) return;
+        const name = this.state.brandSearch.trim(); if (!name) return;
         const exact = this.state.brandSimilar.find((b) => b.exact);
-        if (exact) {
-            this.notification.add(_t("La marca ya existe como \"%s\"; se usará esa.", exact.name), { type: "info" });
-            this.selectBrand(exact);
-            return;
-        }
+        if (exact) { this.notification.add(_t("La marca ya existe como \"%s\"; se usará esa.", exact.name), { type: "info" }); this.selectBrand(exact); return; }
         try {
-            const [id] = await this.orm.create("biotex.brand", [{ name }]);
-            const brand = { id, name };
-            this.state.brands.push(brand);
-            this.state.brands.sort((a, b) => a.name.localeCompare(b.name));
+            const code = (this.state.newBrandCode || "").toUpperCase();
+            const [id] = await this.orm.create("biotex.brand", [{ name, code }]);
+            const brand = { id, name, code };
+            this.state.brands.push(brand); this.state.brands.sort((a, b) => a.name.localeCompare(b.name));
             this.selectBrand(brand);
-        } catch (e) {
-            this.notification.add(e.data?.message || e.message, { type: "danger" });
-        }
+        } catch (e) { this.notification.add(e.data?.message || e.message, { type: "danger" }); }
     }
+
+    // ------------------------------------------------------------ uso y origen
     async onEquipmentSearch(ev) {
         this.state.equipmentSearch = ev.target.value;
-        if (this.state.equipmentSearch.length < 2) { this.state.equipments = []; return; }
-        this.state.equipments = await this.orm.searchRead(
-            "biotex.equipment", [["display_name", "ilike", this.state.equipmentSearch]], ["id", "display_name"], { limit: 8 });
+        this.state.equipments = this.state.equipmentSearch.length < 2 ? [] :
+            await this.orm.searchRead("biotex.equipment", [["display_name", "ilike", this.state.equipmentSearch]], ["id", "display_name"], { limit: 8 });
     }
     toggleEquipment(eq) {
-        const ids = this.state.product.biotex_equipment_ids;
-        const i = ids.indexOf(eq.id);
+        const ids = this.state.product.biotex_equipment_ids; const i = ids.indexOf(eq.id);
         if (i >= 0) ids.splice(i, 1); else ids.push(eq.id);
-        if (!this.state.equipmentLabels) this.state.equipmentLabels = {};
         this.state.equipmentLabels[eq.id] = eq.display_name;
-        this.state.hasChanges = true;
+        if (!this.state.product.biotex_main_equipment_id && ids.length) this.state.product.biotex_main_equipment_id = ids[0];
+        if (!ids.includes(this.state.product.biotex_main_equipment_id)) this.state.product.biotex_main_equipment_id = ids[0] || false;
     }
-    equipmentLabel(id) { return (this.state.equipmentLabels || {})[id] || `#${id}`; }
-    async onManufacturerSearch(ev) {
-        const q = ev.target.value;
-        this.state.manufacturers = q.length > 1
-            ? await this.orm.searchRead("res.partner", [["name", "ilike", q], ["is_company", "=", true]], ["id", "name"], { limit: 8 }) : [];
+    equipmentLabel(id) { return this.state.equipmentLabels[id] || `#${id}`; }
+    toggleSpecialty(s) {
+        const ids = this.state.product.biotex_specialty_ids; const i = ids.indexOf(s.id);
+        if (i >= 0) ids.splice(i, 1); else ids.push(s.id);
+        if (!ids.includes(this.state.product.biotex_main_specialty_id)) this.state.product.biotex_main_specialty_id = ids[0] || false;
     }
-    selectManufacturer(m) {
-        this.state.product.biotex_manufacturer_id = m.id;
-        this.state.manufacturerName = m.name;
-        this.state.manufacturers = [];
-        this.state.hasChanges = true;
+    async onPartnerSearch(kind, ev) {
+        const q = ev.target.value; const dom = kind === "distributors" ? [["name", "ilike", q], ["supplier_rank", ">", 0]] : [["name", "ilike", q], ["is_company", "=", true]];
+        this.state[kind] = q.length > 1 ? await this.orm.searchRead("res.partner", dom, ["id", "name"], { limit: 8 }) : [];
     }
+    selectPartner(kind, m) {
+        if (kind === "manufacturers") { this.state.product.biotex_manufacturer_id = m.id; this.state.manufacturerName = m.name; }
+        else { this.state.product.biotex_primary_distributor_id = m.id; this.state.distributorName = m.name; }
+        this.state[kind] = [];
+    }
+    onCountry(ev) { const id = parseInt(ev.target.value) || false; this.state.product.biotex_country_id = id; this.state.countryName = (this.state.countries.find((c) => c.id === id) || {}).name || ""; }
 
     // ------------------------------------------------------------ fotos
     get photoSlots() { return ["image_1920", "biotex_image_2", "biotex_image_3"]; }
     onPhoto(field, ev) {
-        const file = ev.target.files[0];
-        if (!file) return;
+        const file = ev.target.files[0]; if (!file) return;
         const reader = new FileReader();
-        reader.onload = () => {
-            this.state.product[field] = reader.result.split(",")[1];
-            this.state.hasChanges = true;
-        };
+        reader.onload = () => { this.state.product[field] = reader.result.split(",")[1]; };
         reader.readAsDataURL(file);
     }
-    clearPhoto(field) { this.state.product[field] = null; this.state.hasChanges = true; }
-    get photoCount() {
-        return this.photoSlots.filter((f) => this.state.product[f]).length + (this.state.product.existingPhotos || 0);
-    }
+    clearPhoto(field) { this.state.product[field] = null; }
+    get photoCount() { return this.photoSlots.filter((f) => this.state.product[f]).length + (this.state.product.existingPhotos || 0); }
 
-    // ------------------------------------------------------------ guardar
-    async save(andNext = true) {
+    // ------------------------------------------------------------ revisión / guardar
+    get previewName() {
         const p = this.state.product;
-        for (let i = 0; i < STEPS.length; i++) {
-            if (!this.stepValid(i)) { this.state.step = i; this.next(); return; }
-        }
-        if (this.photoCount === 0 && this.family?.photo_required) {
-            this.notification.add(_t("Esta familia exige foto. El producto quedará como 'Clasificado sin foto'."), { type: "warning" });
-        }
-        this.state.saving = true;
-        const vals = {
-            biotex_name: p.biotex_name, biotex_measure: p.biotex_measure, biotex_content: p.biotex_content,
-            biotex_usage_notes: p.biotex_usage_notes, biotex_family_id: p.biotex_family_id,
-            biotex_brand_id: p.biotex_brand_id, biotex_model: p.biotex_model, biotex_reference: p.biotex_reference || false,
-            biotex_manufacturer_id: p.biotex_manufacturer_id || false,
-            biotex_equipment_ids: [[6, 0, p.biotex_equipment_ids]],
-            name: this.previewName,
+        return [p.biotex_name, p.biotex_measure, p.biotex_content].map((x) => (x || "").trim()).filter(Boolean).join(" ");
+    }
+    async refreshPreview() {
+        const p = this.state.product;
+        this.state.preview = await this.orm.call("product.template", "biotex_classifier_preview", [{ id: p.id, biotex_family_id: p.biotex_family_id, biotex_classifier_id: p.biotex_classifier_id, biotex_brand_id: p.biotex_brand_id }]);
+    }
+    vals() {
+        const p = this.state.product;
+        const v = {
+            biotex_name: p.biotex_name, biotex_measure: p.biotex_measure, biotex_content: p.biotex_content, biotex_package_type: p.biotex_package_type,
+            biotex_package_qty: parseFloat(p.biotex_package_qty) || 1, biotex_usage_notes: p.biotex_usage_notes, biotex_family_id: p.biotex_family_id,
+            biotex_classifier_id: p.biotex_classifier_id, biotex_brand_id: p.biotex_brand_id, biotex_model: p.biotex_model, biotex_reference: p.biotex_reference || false,
+            biotex_manufacturer_id: p.biotex_manufacturer_id || false, biotex_country_id: p.biotex_country_id || false, biotex_primary_distributor_id: p.biotex_primary_distributor_id || false,
+            biotex_equipment_ids: [[6, 0, p.biotex_equipment_ids]], biotex_main_equipment_id: p.biotex_main_equipment_id || false,
+            biotex_specialty_ids: [[6, 0, p.biotex_specialty_ids]], biotex_main_specialty_id: p.biotex_main_specialty_id || false, name: this.previewName,
         };
-        for (const f of this.photoSlots) if (p[f]) vals[f] = p[f];
+        for (const f of this.photoSlots) if (p[f]) v[f] = p[f];
+        return v;
+    }
+    async save(andNext = true) {
+        for (let i = 0; i < STEPS.length; i++) if (!this.stepValid(i)) { this.state.step = i; this.next(); return; }
+        if (this.photoCount === 0 && this.family?.photo_required) this.notification.add(_t("Esta familia exige foto: el producto quedará como 'Clasificado sin foto'."), { type: "warning" });
+        this.state.saving = true;
         try {
-            const res = await this.orm.call("product.template", "biotex_classifier_save", [p.id || false, vals]);
+            const res = await this.orm.call("product.template", "biotex_classifier_save", [this.state.product.id || false, this.vals()]);
             this.state.queue[this.state.queueIndex] = { ...this.current, id: res.id, name: res.name, default_code: res.default_code, saved: true };
             this.state.done += 1;
-            this.notification.add(_t("Guardado: %s → %s", res.default_code, res.name), { type: "success" });
+            this.notification.add(_t("Guardado: %s → %s (%s)", res.default_code, res.name, res.generic), { type: "success" });
             if (andNext) this.skip();
-        } catch (e) {
-            this.notification.add(e.data?.message || e.message, { type: "danger", sticky: true });
-        } finally {
-            this.state.saving = false;
-        }
+        } catch (e) { this.notification.add(e.data?.message || e.message, { type: "danger", sticky: true }); }
+        finally { this.state.saving = false; }
     }
     openForm() {
         if (!this.current?.id) return;
