@@ -16,7 +16,7 @@ const STEPS = [
 ];
 
 const EMPTY = () => ({
-    id: false, name: "", biotex_name: "", biotex_measure: "", biotex_content: "", biotex_package_type: "", biotex_package_qty: 1,
+    id: false, name: "", biotex_name: "", biotex_measure: "", biotex_content: "", biotex_package_type_id: false, biotex_package_qty: 1,
     biotex_usage_notes: "", biotex_group_id: false, biotex_family_id: false, biotex_classifier_id: false, biotex_brand_id: false,
     biotex_model: "", biotex_reference: "", biotex_manufacturer_id: false, biotex_country_id: false, biotex_primary_distributor_id: false,
     biotex_equipment_ids: [], biotex_main_equipment_id: false, biotex_specialty_ids: [], biotex_main_specialty_id: false,
@@ -40,18 +40,19 @@ export class BiotexClassifier extends Component {
             step: 0, tree: [], queue: [], queueIndex: 0, product: EMPTY(), familySearch: "", classifierSearch: "",
             brands: [], brandSearch: "", brandSimilar: [], newBrandCode: "", manufacturers: [], manufacturerName: "",
             distributors: [], distributorName: "", countries: [], countryName: "", equipments: [], equipmentSearch: "", equipmentLabels: {},
-            specialties: [], preview: { clave: "", generic: "" }, saving: false, done: 0,
+            specialties: [], packageTypes: [], preview: { clave: "", generic: "" }, saving: false, done: 0,
         });
         onWillStart(async () => {
             const ctx = this.props.action?.context || {};
-            const [tree, queue, brands, specialties, countries] = await Promise.all([
+            const [tree, queue, brands, specialties, countries, packageTypes] = await Promise.all([
                 this.orm.call("product.category", "biotex_get_tree", []),
                 this.orm.call("product.template", "biotex_classifier_queue", [ctx.biotex_product_ids || null]),
                 this.orm.searchRead("biotex.brand", [], ["id", "name", "code"], { limit: 1000, order: "name" }),
                 this.orm.searchRead("biotex.specialty", [], ["id", "name", "code"], { order: "name" }),
                 this.orm.searchRead("res.country", [], ["id", "name"], { order: "name" }),
+                this.orm.searchRead("biotex.package.type", [], ["id", "name"], { order: "sequence, name" }),
             ]);
-            Object.assign(this.state, { tree, queue, brands, specialties, countries });
+            Object.assign(this.state, { tree, queue, brands, specialties, countries, packageTypes });
             this.loadCurrent();
         });
     }
@@ -66,7 +67,7 @@ export class BiotexClassifier extends Component {
         if (p) {
             Object.assign(prod, {
                 id: p.id, name: p.name, biotex_name: p.biotex_name || p.name || "", biotex_measure: p.biotex_measure || "", biotex_content: p.biotex_content || "",
-                biotex_package_type: p.biotex_package_type || "", biotex_package_qty: p.biotex_package_qty || 1, biotex_usage_notes: p.biotex_usage_notes || "",
+                biotex_package_type_id: this.m2o(p.biotex_package_type_id), biotex_package_qty: p.biotex_package_qty || 1, biotex_usage_notes: p.biotex_usage_notes || "",
                 biotex_group_id: this.m2o(p.biotex_group_id), biotex_family_id: this.m2o(p.biotex_family_id), biotex_classifier_id: this.m2o(p.biotex_classifier_id),
                 biotex_brand_id: this.m2o(p.biotex_brand_id), biotex_model: p.biotex_model || "", biotex_reference: p.biotex_reference || "",
                 biotex_manufacturer_id: this.m2o(p.biotex_manufacturer_id), biotex_country_id: this.m2o(p.biotex_country_id), biotex_primary_distributor_id: this.m2o(p.biotex_primary_distributor_id),
@@ -109,6 +110,11 @@ export class BiotexClassifier extends Component {
     }
     back() { if (this.state.step > 0) this.state.step -= 1; }
     onInput(field, ev) { this.state.product[field] = ev.target.value; }
+    onSelect(field, ev) { this.state.product[field] = parseInt(ev.target.value, 10) || false; }
+    get packageTypeName() {
+        const pt = this.state.packageTypes.find((p) => p.id === this.state.product.biotex_package_type_id);
+        return pt ? pt.name : "";
+    }
 
     // ------------------------------------------------------------ grupo / familia / clasificador
     get group() { return this.state.tree.find((g) => g.id === this.state.product.biotex_group_id); }
@@ -219,7 +225,7 @@ export class BiotexClassifier extends Component {
     vals() {
         const p = this.state.product;
         const v = {
-            biotex_name: p.biotex_name, biotex_measure: p.biotex_measure, biotex_content: p.biotex_content, biotex_package_type: p.biotex_package_type,
+            biotex_name: p.biotex_name, biotex_measure: p.biotex_measure, biotex_content: p.biotex_content, biotex_package_type_id: p.biotex_package_type_id || false,
             biotex_package_qty: parseFloat(p.biotex_package_qty) || 1, biotex_usage_notes: p.biotex_usage_notes, biotex_family_id: p.biotex_family_id,
             biotex_classifier_id: p.biotex_classifier_id, biotex_brand_id: p.biotex_brand_id, biotex_model: p.biotex_model, biotex_reference: p.biotex_reference || false,
             biotex_manufacturer_id: p.biotex_manufacturer_id || false, biotex_country_id: p.biotex_country_id || false, biotex_primary_distributor_id: p.biotex_primary_distributor_id || false,

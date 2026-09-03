@@ -38,7 +38,7 @@
                             <field name="biotex_name"/>
                             <field name="biotex_measure"/>
                             <field name="biotex_content"/>
-                            <field name="biotex_package_type"/>
+                            <field name="biotex_package_type_id"/>
                             <field name="biotex_package_qty"/>
                             <field name="biotex_usage_notes"/>
                             <field name="biotex_high_rotation"/>

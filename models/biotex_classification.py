@@ -240,6 +240,20 @@ class BiotexClassificationSession(models.Model):
                 'old_name': product.name,
                 'new_name': product.name,
                 'uom_id': product.uom_id.id,
+                'measure': product.biotex_measure,
+                'content': product.biotex_content,
+                'package_type_id': product.biotex_package_type_id.id,
+                'package_qty': product.biotex_package_qty or 1.0,
+                'brand_id': product.biotex_brand_id.id,
+                'manufacturer_ref': product.biotex_reference,
+                'model': product.biotex_model,
+                'barcode': product.barcode,
+                'country_id': product.biotex_country_id.id,
+                'manufacturer_id': product.biotex_manufacturer_id.id,
+                'distributor_id': product.biotex_primary_distributor_id.id,
+                'equipment_id': product.biotex_main_equipment_id.id,
+                'specialty_id': product.biotex_main_specialty_id.id,
+                'notes': product.biotex_characteristics,
             })
         return self._workspace_session()
 
@@ -261,13 +275,75 @@ class BiotexClassificationSession(models.Model):
         return self._workspace_session()
 
     def workspace_update_line(self, line_id, vals):
+        """Guarda el detalle de una línea. Valida en servidor lo que el modal valida en pantalla."""
         self.ensure_one()
         self._check_editable()
+        Line = self.env['biotex.classification.session.line']
         line = self.line_ids.filtered(lambda l: l.id == line_id)
         if not line:
             raise UserError('La línea ya no pertenece a esta sesión.')
-        line.write({k: v for k, v in vals.items() if k in ('new_name', 'uom_id')})
+        allowed = ('new_name', 'uom_id') + Line.DETAIL_FIELDS
+        clean = {k: v for k, v in vals.items() if k in allowed}
+        if not (clean.get('new_name') or line.new_name):
+            raise UserError('El nuevo nombre es obligatorio.')
+        if not (clean.get('uom_id') or line.uom_id):
+            raise UserError('La unidad de medida es obligatoria.')
+        barcode = (clean.get('barcode') or '').strip()
+        if barcode:
+            clash = self.env['product.template'].search(
+                [('barcode', '=', barcode), ('id', '!=', line.product_id.id)], limit=1)
+            if clash:
+                raise UserError('El código de barras %s ya pertenece a "%s".' % (barcode, clash.display_name))
+            other = Line.search([('barcode', '=', barcode), ('id', '!=', line.id),
+                                 ('session_id.state', '=', 'draft')], limit=1)
+            if other:
+                raise UserError('El código de barras %s ya está capturado en la línea "%s" de esta clasificación.' % (barcode, other.display_name))
+            clean['barcode'] = barcode
+        ref = (clean.get('manufacturer_ref') or '').strip()
+        if ref:
+            clash = self.env['product.template'].search(
+                [('biotex_reference', '=ilike', ref), ('id', '!=', line.product_id.id)], limit=1)
+            if clash:
+                raise UserError('La referencia del fabricante %s ya pertenece a "%s". No se repite entre productos.' % (ref, clash.display_name))
+            clean['manufacturer_ref'] = ref
+        line.write(clean)
         return self._workspace_session()
+
+    def workspace_line_detail(self, line_id):
+        """Datos de la línea y catálogos que el modal necesita, en una sola llamada."""
+        self.ensure_one()
+        line = self.line_ids.filtered(lambda l: l.id == line_id)
+        if not line:
+            raise UserError('La línea ya no pertenece a esta sesión.')
+        return {
+            'line': line._workspace_detail(),
+            'catalogs': {
+                'uoms': self.env['uom.uom'].search_read([], ['id', 'name'], order='sequence, id'),
+                'package_types': self.env['biotex.package.type'].search_read([], ['id', 'name'], order='sequence, name'),
+                'countries': self.env['res.country'].search_read([], ['id', 'name'], order='name'),
+                'brands': self.env['biotex.brand'].search_read([], ['id', 'name', 'code'], order='name'),
+                'specialties': self.env['biotex.specialty'].search_read([], ['id', 'name', 'code'], order='name'),
+                'contents': sorted({p['biotex_content'] for p in self.env['product.template'].search_read(
+                    [('biotex_content', '!=', False)], ['biotex_content'], limit=500) if p['biotex_content']}),
+            },
+            'classification_brand_id': self.brand_id.id or False,
+            'classification_brand_name': self.brand_id.display_name or '',
+        }
+
+    @api.model
+    def workspace_search_relation(self, model, query, limit=10):
+        """Buscador para fabricante, distribuidor y equipo: usa los catálogos existentes, no crea nada."""
+        allowed = {
+            'res.partner': [('is_company', '=', True)],
+            'biotex.equipment': [],
+        }
+        if model not in allowed:
+            raise UserError('Modelo no permitido en el buscador del asistente.')
+        domain = list(allowed[model])
+        if model == 'res.partner' and (self.env.context.get('biotex_supplier_only')):
+            domain.append(('supplier_rank', '>', 0))
+        records = self.env[model].search(domain + [('display_name', 'ilike', query or '')], limit=limit)
+        return [{'id': r.id, 'name': r.display_name} for r in records]
 
     @api.model
     def workspace_brand_hints(self, family_id, classifier_id):
@@ -313,6 +389,32 @@ class BiotexClassificationSessionLine(models.Model):
     reference = fields.Char(string='Referencia generada', compute='_compute_reference', store=True)
     state = fields.Selection([('draft', 'Pendiente'), ('applied', 'Aplicada')], default='draft', required=True)
 
+    # --- información adicional: se captura en la sesión y se escribe en el producto al confirmar ---
+    measure = fields.Char(string='Medidas')
+    content = fields.Char(string='UI unidad indivisible')
+    package_type_id = fields.Many2one('biotex.package.type', string='Tipo de empaque', ondelete='restrict')
+    package_qty = fields.Float(string='Cantidad de presentación', default=1.0)
+    brand_id = fields.Many2one('biotex.brand', string='Marca del producto', ondelete='restrict',
+                               help='Marca almacenada como atributo. La marca de la clasificación se define en la sesión.')
+    manufacturer_ref = fields.Char(string='Referencia del fabricante')
+    model = fields.Char(string='Modelo')
+    barcode = fields.Char(string='Código de barras')
+    country_id = fields.Many2one('res.country', string='País de origen')
+    manufacturer_id = fields.Many2one('res.partner', string='Fabricante')
+    distributor_id = fields.Many2one('res.partner', string='Distribuidor primario')
+    equipment_id = fields.Many2one('biotex.equipment', string='Equipo relacionado')
+    specialty_id = fields.Many2one('biotex.specialty', string='Especialidad')
+    notes = fields.Text(string='Notas')
+
+    DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'brand_id', 'manufacturer_ref', 'model',
+                     'barcode', 'country_id', 'manufacturer_id', 'distributor_id', 'equipment_id', 'specialty_id', 'notes')
+
+    @api.constrains('package_qty')
+    def _check_package_qty(self):
+        for line in self:
+            if line.package_qty and line.package_qty <= 0:
+                raise ValidationError('La cantidad de presentación debe ser un número positivo.')
+
     _product_uniq = models.Constraint(
         'unique(session_id, product_id)',
         'El producto ya está en esta sesión de clasificación.',
@@ -343,7 +445,36 @@ class BiotexClassificationSessionLine(models.Model):
             'consecutive_label': CONSECUTIVE_FORMAT % self.consecutive if self.consecutive else '',
             'reference': self.reference or '',
             'state': self.state,
+            'brand_name': self.brand_id.display_name or '',
+            'measure': self.measure or '',
+            'barcode': self.barcode or '',
+            'detail_filled': sum(1 for f in self.DETAIL_FIELDS if self[f]),
         }
+
+    def _workspace_detail(self):
+        """Todos los campos editables del modal, con etiquetas de los relacionados."""
+        self.ensure_one()
+        data = self._workspace_line()
+        data.update({
+            'measure': self.measure or '',
+            'content': self.content or '',
+            'package_type_id': self.package_type_id.id or False,
+            'package_qty': self.package_qty or 1.0,
+            'brand_id': self.brand_id.id or False,
+            'manufacturer_ref': self.manufacturer_ref or '',
+            'model': self.model or '',
+            'barcode': self.barcode or '',
+            'country_id': self.country_id.id or False,
+            'manufacturer_id': self.manufacturer_id.id or False,
+            'manufacturer_name': self.manufacturer_id.display_name or '',
+            'distributor_id': self.distributor_id.id or False,
+            'distributor_name': self.distributor_id.display_name or '',
+            'equipment_id': self.equipment_id.id or False,
+            'equipment_name': self.equipment_id.display_name or '',
+            'specialty_id': self.specialty_id.id or False,
+            'notes': self.notes or '',
+        })
+        return data
 
     def _apply(self):
         """Escribe la clasificación y la referencia en el producto. Solo se llama al confirmar."""
@@ -361,7 +492,24 @@ class BiotexClassificationSessionLine(models.Model):
             vals['name'] = self.new_name
         if self.uom_id and self.uom_id != product.uom_id:
             vals['uom_id'] = self.uom_id.id
-        if not product.barcode and not product.biotex_reference:
+        detail = {
+            'biotex_measure': self.measure, 'biotex_content': self.content,
+            'biotex_package_type_id': self.package_type_id.id, 'biotex_package_qty': self.package_qty or 1.0,
+            'biotex_brand_id': self.brand_id.id or session.brand_id.id,
+            'biotex_reference': self.manufacturer_ref, 'biotex_model': self.model,
+            'biotex_country_id': self.country_id.id, 'biotex_manufacturer_id': self.manufacturer_id.id,
+            'biotex_primary_distributor_id': self.distributor_id.id, 'biotex_characteristics': self.notes,
+        }
+        vals.update({k: v for k, v in detail.items() if v})
+        if self.barcode:
+            vals['barcode'] = self.barcode
+        elif not product.barcode and not product.biotex_reference and not self.manufacturer_ref:
             vals['barcode'] = self.reference
+        if self.equipment_id:
+            vals['biotex_main_equipment_id'] = self.equipment_id.id
+            vals['biotex_equipment_ids'] = [(4, self.equipment_id.id)]
+        if self.specialty_id:
+            vals['biotex_main_specialty_id'] = self.specialty_id.id
+            vals['biotex_specialty_ids'] = [(4, self.specialty_id.id)]
         product.write(vals)
         self.state = 'applied'

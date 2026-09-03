@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Tipos de empaque: presentación comercial del insumo. Editable en Catálogo > Configuración. -->
+    <record id="package_type_pieza" model="biotex.package.type"><field name="name">Pieza</field><field name="code">PZA</field><field name="sequence">10</field></record>
+    <record id="package_type_sobre" model="biotex.package.type"><field name="name">Sobre</field><field name="code">SOB</field><field name="sequence">20</field></record>
+    <record id="package_type_caja" model="biotex.package.type"><field name="name">Caja</field><field name="code">CAJ</field><field name="sequence">30</field></record>
+    <record id="package_type_bolsa" model="biotex.package.type"><field name="name">Bolsa</field><field name="code">BOL</field><field name="sequence">40</field></record>
+    <record id="package_type_paquete" model="biotex.package.type"><field name="name">Paquete</field><field name="code">PAQ</field><field name="sequence">50</field></record>
+    <record id="package_type_frasco" model="biotex.package.type"><field name="name">Frasco</field><field name="code">FRA</field><field name="sequence">60</field></record>
+    <record id="package_type_tubo" model="biotex.package.type"><field name="name">Tubo</field><field name="code">TUB</field><field name="sequence">70</field></record>
+    <record id="package_type_ampolleta" model="biotex.package.type"><field name="name">Ampolleta</field><field name="code">AMP</field><field name="sequence">80</field></record>
+    <record id="package_type_otro" model="biotex.package.type"><field name="name">Otro</field><field name="code">OTR</field><field name="sequence">99</field></record>
+</odoo>

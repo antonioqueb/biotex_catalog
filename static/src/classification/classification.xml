@@ -297,7 +297,7 @@
                                         <td class="o_bcw_mono o_bcw_ref"><t t-esc="line.reference or '—'"/></td>
                                         <td class="o_bcw_mono"><t t-esc="line.consecutive_label or '—'"/></td>
                                         <td class="o_bcw_w_act2">
-                                            <button class="o_bcw_icon_btn" t-on-click="() => this.editLine(line)" title="Editar producto"><i class="fa fa-pencil"/></button>
+                                            <button class="o_bcw_icon_btn" t-on-click="() => this.editLine(line)" title="Editar producto clasificado"><i class="fa fa-pencil"/></button>
                                             <button class="o_bcw_icon_btn o_bcw_danger" t-on-click="() => this.removeLine(line)"
                                                     t-att-disabled="confirmed" title="Quitar de la lista"><i class="fa fa-trash-o"/></button>
                                         </td>
@@ -331,33 +331,208 @@
 </t>
 
 <t t-name="biotex_catalog.LineEditorDialog">
-    <Dialog title="title" size="'md'">
-        <div class="o_bcw_editor">
-            <label class="o_bcw_editor_label">Nombre actual</label>
-            <input type="text" class="o_bcw_input" t-att-value="draft.new_name" t-att-readonly="props.readonly"
-                   t-on-input="(ev) => this.onInput('new_name', ev)"/>
+    <Dialog size="'xl'" contentClass="'o_bcw_modal'">
+        <t t-set-slot="header">
+            <div class="o_bcw_modal_head">
+                <div>
+                    <h4 class="o_bcw_modal_title"><i class="fa fa-pencil-square-o"/> Editar producto clasificado</h4>
+                    <p class="o_bcw_modal_sub">Modifica la información del producto antes de aplicar la clasificación.</p>
+                </div>
+                <button class="btn-close" aria-label="Cerrar" t-on-click="requestClose"/>
+            </div>
+        </t>
 
-            <label class="o_bcw_editor_label">Nombre anterior</label>
-            <input type="text" class="o_bcw_input" t-att-value="props.line.old_name" readonly="readonly"/>
+        <div t-if="state.loading" class="o_bcw_modal_loading"><i class="fa fa-circle-o-notch fa-spin fa-2x"/></div>
 
-            <label class="o_bcw_editor_label">Unidad de medida</label>
-            <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onInput('uom_id', ev)">
-                <option value="" t-att-selected="!draft.uom_id">—</option>
-                <option t-foreach="props.uoms" t-as="uom" t-key="uom.id"
-                        t-att-value="uom.id" t-att-selected="uom.id === draft.uom_id" t-esc="uom.name"/>
-            </select>
+        <div t-else="" class="o_bcw_modal_body">
+            <!-- identificación: solo lectura -->
+            <div class="o_bcw_grid o_bcw_grid--2">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Referencia + consecutivo</label>
+                    <div class="o_bcw_readonly o_bcw_mono">
+                        <span t-esc="state.line.reference || props.classCode || '—'"/>
+                        <span class="o_bcw_consec" t-if="consecutiveLabel" t-esc="consecutiveLabel"/>
+                    </div>
+                    <small class="o_bcw_help">La clasificación, la marca de la clave y el consecutivo no se modifican aquí.</small>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Nombre actual</label>
+                    <div class="o_bcw_readonly" t-esc="state.line.old_name || '—'"/>
+                    <small class="o_bcw_help">Nombre que el producto tiene hoy en el catálogo.</small>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Nuevo nombre <span class="o_bcw_req">*</span></label>
+                    <input type="text" class="o_bcw_input" t-att-class="{ 'o_bcw_input--error': state.errors.new_name }"
+                           t-att-value="state.draft.new_name" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('new_name', ev)"/>
+                    <small t-if="state.errors.new_name" class="o_bcw_error" t-esc="state.errors.new_name"/>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Unidad de medida <span class="o_bcw_req">*</span></label>
+                    <select class="o_bcw_input" t-att-class="{ 'o_bcw_input--error': state.errors.uom_id }"
+                            t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('uom_id', ev)">
+                        <option value="" t-att-selected="!state.draft.uom_id">—</option>
+                        <option t-foreach="state.catalogs.uoms" t-as="uom" t-key="uom.id" t-att-value="uom.id"
+                                t-att-selected="uom.id === state.draft.uom_id" t-esc="uom.name"/>
+                    </select>
+                    <small t-if="state.errors.uom_id" class="o_bcw_error" t-esc="state.errors.uom_id"/>
+                </div>
+            </div>
 
-            <label class="o_bcw_editor_label">Referencia generada</label>
-            <input type="text" class="o_bcw_input o_bcw_mono" t-att-value="props.line.reference" readonly="readonly"/>
+            <div class="o_bcw_modal_sep"><span>Información adicional</span></div>
 
-            <p class="o_bcw_hint o_bcw_editor_note">
-                La captura completa —descripción estructurada, medidas, presentación, empaque y uso clínico—
-                se agrega en una fase posterior sobre esta misma pantalla.
-            </p>
+            <div class="o_bcw_grid o_bcw_grid--2">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Medidas</label>
+                    <input type="text" class="o_bcw_input" placeholder="75 mm (longitud) x 0.5 mm (diámetro)"
+                           t-att-value="state.draft.measure" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('measure', ev)"/>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">UI unidad indivisible</label>
+                    <input type="text" class="o_bcw_input" list="o_bcw_contents" placeholder="Pieza / Bolsa con 50"
+                           t-att-value="state.draft.content" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('content', ev)"/>
+                    <datalist id="o_bcw_contents">
+                        <option t-foreach="state.catalogs.contents" t-as="c" t-key="c" t-att-value="c"/>
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="o_bcw_grid o_bcw_grid--3">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Tipo de empaque</label>
+                    <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('package_type_id', ev)">
+                        <option value="" t-att-selected="!state.draft.package_type_id">—</option>
+                        <option t-foreach="state.catalogs.package_types" t-as="pt" t-key="pt.id" t-att-value="pt.id"
+                                t-att-selected="pt.id === state.draft.package_type_id" t-esc="pt.name"/>
+                    </select>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Cant. de presentación</label>
+                    <input type="number" min="0" step="1" class="o_bcw_input"
+                           t-att-class="{ 'o_bcw_input--error': state.errors.package_qty }"
+                           t-att-value="state.draft.package_qty" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onNumber('package_qty', ev)"/>
+                    <small t-if="state.errors.package_qty" class="o_bcw_error" t-esc="state.errors.package_qty"/>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Marca</label>
+                    <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('brand_id', ev)">
+                        <option value="" t-att-selected="!state.draft.brand_id">—</option>
+                        <option t-foreach="state.catalogs.brands" t-as="b" t-key="b.id" t-att-value="b.id"
+                                t-att-selected="b.id === state.draft.brand_id" t-esc="b.code + ' · ' + b.name"/>
+                    </select>
+                    <small t-if="brandWarning" class="o_bcw_warn">
+                        <i class="fa fa-exclamation-triangle"/> La clasificación usa <b t-esc="state.classificationBrandName"/>.
+                        Esta marca se guarda como atributo del producto y no cambia la clave.
+                    </small>
+                </div>
+            </div>
+
+            <div class="o_bcw_grid o_bcw_grid--3">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Ref. del fabricante</label>
+                    <input type="text" class="o_bcw_input o_bcw_mono" placeholder="AM-74375-50/40"
+                           t-att-value="state.draft.manufacturer_ref" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('manufacturer_ref', ev)"/>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Modelo</label>
+                    <input type="text" class="o_bcw_input" placeholder="74375-50"
+                           t-att-value="state.draft.model" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('model', ev)"/>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Código de barras</label>
+                    <input type="text" class="o_bcw_input o_bcw_mono" placeholder="7701234567890"
+                           t-att-value="state.draft.barcode" t-att-readonly="props.readonly"
+                           t-on-input="(ev) => this.onInput('barcode', ev)"/>
+                </div>
+            </div>
+
+            <div class="o_bcw_grid o_bcw_grid--3">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">País de origen</label>
+                    <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('country_id', ev)">
+                        <option value="" t-att-selected="!state.draft.country_id">—</option>
+                        <option t-foreach="state.catalogs.countries" t-as="c" t-key="c.id" t-att-value="c.id"
+                                t-att-selected="c.id === state.draft.country_id" t-esc="c.name"/>
+                    </select>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Fabricante</label>
+                    <div t-if="state.labels.manufacturer" class="o_bcw_chip">
+                        <span t-esc="state.labels.manufacturer"/>
+                        <button t-if="!props.readonly" class="o_bcw_chip_x" t-on-click="() => this.clearLookup('manufacturer')"><i class="fa fa-times"/></button>
+                    </div>
+                    <input t-else="" type="text" class="o_bcw_input" placeholder="Buscar fabricante..."
+                           t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('manufacturer', ev)"/>
+                    <div class="o_bcw_lookup" t-if="state.lookups.manufacturer.length">
+                        <button t-foreach="state.lookups.manufacturer" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
+                                t-on-click="() => this.pick('manufacturer', r)" t-esc="r.name"/>
+                    </div>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Distribuidor primario</label>
+                    <div t-if="state.labels.distributor" class="o_bcw_chip">
+                        <span t-esc="state.labels.distributor"/>
+                        <button t-if="!props.readonly" class="o_bcw_chip_x" t-on-click="() => this.clearLookup('distributor')"><i class="fa fa-times"/></button>
+                    </div>
+                    <input t-else="" type="text" class="o_bcw_input" placeholder="Buscar proveedor..."
+                           t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('distributor', ev)"/>
+                    <div class="o_bcw_lookup" t-if="state.lookups.distributor.length">
+                        <button t-foreach="state.lookups.distributor" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
+                                t-on-click="() => this.pick('distributor', r)" t-esc="r.name"/>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_bcw_grid o_bcw_grid--2">
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Equipo relacionado</label>
+                    <div t-if="state.labels.equipment" class="o_bcw_chip">
+                        <span t-esc="state.labels.equipment"/>
+                        <button t-if="!props.readonly" class="o_bcw_chip_x" t-on-click="() => this.clearLookup('equipment')"><i class="fa fa-times"/></button>
+                    </div>
+                    <input t-else="" type="text" class="o_bcw_input" placeholder="Buscar equipo..."
+                           t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('equipment', ev)"/>
+                    <div class="o_bcw_lookup" t-if="state.lookups.equipment.length">
+                        <button t-foreach="state.lookups.equipment" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
+                                t-on-click="() => this.pick('equipment', r)" t-esc="r.name"/>
+                    </div>
+                </div>
+                <div class="o_bcw_field">
+                    <label class="o_bcw_label">Especialidad</label>
+                    <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('specialty_id', ev)">
+                        <option value="" t-att-selected="!state.draft.specialty_id">—</option>
+                        <option t-foreach="state.catalogs.specialties" t-as="sp" t-key="sp.id" t-att-value="sp.id"
+                                t-att-selected="sp.id === state.draft.specialty_id" t-esc="sp.name"/>
+                    </select>
+                </div>
+            </div>
+
+            <div class="o_bcw_field">
+                <label class="o_bcw_label">Notas</label>
+                <textarea class="o_bcw_input o_bcw_textarea" rows="3" placeholder="Electrodo estéril desechable diseñado para estudios de electromiografía."
+                          t-att-readonly="props.readonly" t-on-input="(ev) => this.onInput('notes', ev)"
+                          t-esc="state.draft.notes"/>
+            </div>
+
+            <div t-if="state.confirmClose" class="o_bcw_confirm">
+                <div class="o_bcw_confirm_box">
+                    <p class="o_bcw_confirm_text">¿Deseas salir sin guardar los cambios?</p>
+                    <div class="o_bcw_confirm_actions">
+                        <button class="btn btn-secondary" t-on-click="keepEditing">Continuar editando</button>
+                        <button class="btn btn-outline-danger" t-on-click="discardAndClose">Salir sin guardar</button>
+                    </div>
+                </div>
+            </div>
         </div>
+
         <t t-set-slot="footer">
-            <button class="btn btn-primary" t-att-disabled="props.readonly" t-on-click="save">Guardar</button>
-            <button class="btn btn-secondary" t-on-click="() => props.close()">Cerrar</button>
+            <button class="btn btn-primary" t-att-disabled="props.readonly or state.saving" t-on-click="save">Guardar cambios</button>
+            <button class="btn btn-secondary" t-on-click="requestClose">Cancelar</button>
         </t>
     </Dialog>
 </t>

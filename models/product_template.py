@@ -31,7 +31,7 @@ class ProductTemplate(models.Model):
     biotex_measure = fields.Char(string='Medidas', help='Ej. 36 mm x 44 mm; 21G x 32 mm; 5 ml.')
     biotex_measure_value = fields.Float(string='Medida numérica', compute='_compute_measure_value', store=True)
     biotex_content = fields.Char(string='Unidad indivisible (UI)', help='Presentación mínima de venta. Ej. "Bolsa con 50", "Pieza", "Sobre con 1".')
-    biotex_package_type = fields.Char(string='Tipo de empaque', help='Bolsa, caja, sobre, tubo, frasco...')
+    biotex_package_type_id = fields.Many2one('biotex.package.type', string='Tipo de empaque', ondelete='restrict')
     biotex_package_qty = fields.Float(string='Cantidad por presentación', default=1.0)
 
     # --- identificación ---
@@ -286,7 +286,7 @@ class ProductTemplate(models.Model):
         domain = [('id', 'in', product_ids)] if product_ids else [('biotex_class_state', '!=', 'complete')]
         products = self.search(domain, limit=limit, order='biotex_class_state, write_date')
         return products.read([
-            'name', 'default_code', 'biotex_name', 'biotex_measure', 'biotex_content', 'biotex_package_type', 'biotex_package_qty',
+            'name', 'default_code', 'biotex_name', 'biotex_measure', 'biotex_content', 'biotex_package_type_id', 'biotex_package_qty',
             'biotex_family_id', 'biotex_group_id', 'biotex_classifier_id', 'biotex_brand_id', 'biotex_model', 'biotex_manufacturer_id',
             'biotex_reference', 'biotex_country_id', 'biotex_primary_distributor_id', 'biotex_usage_notes', 'biotex_equipment_ids',
             'biotex_main_equipment_id', 'biotex_specialty_ids', 'biotex_main_specialty_id', 'biotex_class_state', 'biotex_missing',

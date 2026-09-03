@@ -332,16 +332,14 @@ export class BiotexClassificationWorkspace extends Component {
     }
 
     editLine(line) {
+        // El modal captura a fondo un producto y devuelve la sesión ya persistida: la etapa 3
+        // se refresca sin recargar la pantalla ni perder el contexto de la clasificación.
         this.dialog.add(BiotexLineEditorDialog, {
-            line,
-            uoms: this.state.uoms,
+            lineId: line.id,
+            sessionId: this.state.session.id,
             classCode: this.state.session.class_code,
             readonly: this.confirmed,
-            onSave: async (vals) => {
-                Object.assign(line, vals);
-                line.uom_name = this.state.uoms.find((u) => u.id === line.uom_id)?.name || "";
-                await this.saveLine(line, { new_name: line.new_name, uom_id: line.uom_id });
-            },
+            onSaved: (session) => this.applySession(session),
         });
     }
 

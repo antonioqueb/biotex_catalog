@@ -219,3 +219,29 @@ class BiotexGeneric(models.Model):
             if re.sub(r'[^a-z0-9]', '', g.name.lower()) == norm and (g.measure or '') == (measure or ''):
                 return g
         return self.create({'name': name, 'family_id': family.id, 'classifier_id': classifier.id, 'measure': measure or False})
+
+
+class BiotexPackageType(models.Model):
+    """Tipo de empaque: catálogo configurable (pieza, sobre, caja, bolsa, paquete...).
+
+    Odoo no trae un catálogo equivalente: `stock.package.type` describe embalaje logístico
+    con dimensiones para envío, no la presentación comercial del insumo.
+    """
+    _name = 'biotex.package.type'
+    _description = 'Tipo de empaque'
+    _order = 'sequence, name'
+
+    name = fields.Char(required=True)
+    code = fields.Char(size=8)
+    sequence = fields.Integer(default=10)
+    active = fields.Boolean(default=True)
+
+    _name_uniq = models.Constraint('unique(name)', 'Ya existe un tipo de empaque con ese nombre.')
+
+    @api.model
+    def resolve(self, label):
+        """Devuelve el tipo por nombre, creándolo si el catálogo aún no lo tiene (carga de datos)."""
+        label = (label or '').strip()
+        if not label:
+            return self.browse()
+        return self.search([('name', '=ilike', label)], limit=1) or self.create({'name': label.capitalize()})

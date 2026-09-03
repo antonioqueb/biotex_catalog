@@ -11,6 +11,7 @@
         'security/catalog_security.xml',
         'security/ir.model.access.csv',
         'data/schema_data.xml',
+        'data/package_type_data.xml',
         'views/biotex_schema_views.xml',
         'views/biotex_brand_views.xml',
         'views/biotex_equipment_views.xml',
