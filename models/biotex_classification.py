@@ -284,10 +284,16 @@ class BiotexClassificationSession(models.Model):
             raise UserError('La línea ya no pertenece a esta sesión.')
         allowed = ('new_name', 'uom_id') + Line.DETAIL_FIELDS
         clean = {k: v for k, v in vals.items() if k in allowed}
-        if not (clean.get('new_name') or line.new_name):
+        def effective(field, current):
+            # un campo enviado vacío es un borrado deliberado; uno ausente conserva lo guardado
+            return clean[field] if field in clean else current
+        if not (effective('new_name', line.new_name) or '').strip():
             raise UserError('El nuevo nombre es obligatorio.')
-        if not (clean.get('uom_id') or line.uom_id):
+        if not effective('uom_id', line.uom_id.id):
             raise UserError('La unidad de medida es obligatoria.')
+        qty = effective('package_qty', line.package_qty)
+        if qty not in (None, False, '') and float(qty) <= 0:
+            raise UserError('La cantidad de presentación debe ser un número positivo.')
         barcode = (clean.get('barcode') or '').strip()
         if barcode:
             clash = self.env['product.template'].search(
