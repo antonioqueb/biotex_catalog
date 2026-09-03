@@ -20,7 +20,7 @@
                 <field name="biotex_missing" invisible="1"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Clasificación Biotex" name="biotex" >
+                <page string="Clasificación" name="biotex">
                     <group>
                         <group string="Descripción estructurada (nombre + medida + contenido)">
                             <field name="biotex_name"/>

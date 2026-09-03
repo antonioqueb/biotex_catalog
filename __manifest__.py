@@ -1,8 +1,8 @@
 {
-    'name': 'Biotex - Catálogo maestro',
+    'name': 'Catálogo de insumos',
     'summary': 'Grupo > familia > clave, descripción estructurada, marcas, fotos, estado de clasificación, asistente guiado, sinónimos, etiqueta QR',
     'version': '19.0.1.0.0',
-    'category': 'Biotex',
+    'category': 'Distribución de insumos',
     'author': 'Alphaqueb Consulting SAS',
     'license': 'LGPL-3',
     'depends': ['biotex_base', 'product', 'stock', 'purchase'],
