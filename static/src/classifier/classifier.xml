@@ -111,13 +111,13 @@
                     <t t-if="stepKey === 'brand'">
                         <h5>Marca <small class="text-muted fw-normal">(segmento MMMM de la clave)</small></h5>
                         <div style="max-width: 640px;">
-                            <div t-if="brand" class="mb-2"><span class="badge text-bg-primary fs-6"><t t-esc="brand.code"/> · <t t-esc="brand.name"/></span><button class="btn btn-link btn-sm" t-on-click="() => { state.product.biotex_brand_id = false; }">cambiar</button></div>
+                            <div t-if="brand" class="mb-2"><span class="badge text-bg-primary fs-6"><t t-esc="brand.code"/> · <t t-esc="brand.name"/></span><button class="btn btn-link btn-sm" t-on-click="clearBrand">cambiar</button></div>
                             <input class="form-control" placeholder="Escriba para buscar o crear..." t-att-value="state.brandSearch" t-on-input="onBrandSearch"/>
                             <div class="list-group mt-1" t-if="state.brandSearch">
                                 <button t-foreach="filteredBrands" t-as="b" t-key="b.id" class="list-group-item list-group-item-action py-1" t-on-click="() => this.selectBrand(b)"><span class="badge text-bg-secondary me-2" t-esc="b.code"/><t t-esc="b.name"/></button>
                                 <button t-if="!filteredBrands.some(b => b.name.toLowerCase() === state.brandSearch.toLowerCase())" class="list-group-item list-group-item-action py-1 text-primary" t-on-click="createBrand">
                                     <i class="fa fa-plus me-1"/>Crear marca "<t t-esc="state.brandSearch"/>" con código
-                                    <input class="form-control form-control-sm d-inline-block ms-1 text-uppercase" style="width: 5em" maxlength="4" t-att-value="state.newBrandCode" t-on-click.stop="" t-on-input.stop="(ev) => state.newBrandCode = ev.target.value.toUpperCase()"/>
+                                    <input class="form-control form-control-sm d-inline-block ms-1 text-uppercase" style="width: 5em" maxlength="4" t-att-value="state.newBrandCode" t-on-click.stop="noop" t-on-input.stop="onBrandCode"/>
                                 </button>
                             </div>
                             <div t-if="state.brandSimilar.length" class="alert alert-warning py-1 mt-2 small"><i class="fa fa-exclamation-triangle me-1"/>Posibles duplicados:
@@ -151,7 +151,7 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Equipos relacionados <small class="text-muted fw-normal">(el primero es el principal)</small></label>
                                 <div class="mb-1"><t t-foreach="state.product.biotex_equipment_ids" t-as="eid" t-key="eid">
-                                    <span class="badge me-1" t-att-class="eid === state.product.biotex_main_equipment_id ? 'text-bg-primary' : 'text-bg-info'" role="button" t-on-click="() => { state.product.biotex_main_equipment_id = eid; }" title="Clic para marcar como principal">
+                                    <span class="badge me-1" t-att-class="eid === state.product.biotex_main_equipment_id ? 'text-bg-primary' : 'text-bg-info'" role="button" t-on-click="() => this.setMainEquipment(eid)" title="Clic para marcar como principal">
                                         <t t-esc="equipmentLabel(eid)"/> <i class="fa fa-times ms-1" t-on-click.stop="() => this.toggleEquipment({id: eid, display_name: equipmentLabel(eid)})"/></span></t></div>
                                 <input class="form-control" placeholder="Buscar tipo de equipo o marca/modelo..." t-att-value="state.equipmentSearch" t-on-input="onEquipmentSearch"/>
                                 <div class="list-group mt-1"><button t-foreach="state.equipments" t-as="eq" t-key="eq.id" class="list-group-item list-group-item-action py-1" t-on-click="() => this.toggleEquipment(eq)">
@@ -160,7 +160,7 @@
                                 <div class="d-flex flex-wrap gap-1">
                                     <t t-foreach="state.specialties" t-as="s" t-key="s.id">
                                         <button class="btn btn-sm" t-att-class="state.product.biotex_main_specialty_id === s.id ? 'btn-primary' : (state.product.biotex_specialty_ids.includes(s.id) ? 'btn-info' : 'btn-outline-secondary')"
-                                                t-on-click="() => this.toggleSpecialty(s)" t-on-dblclick="() => { if (!state.product.biotex_specialty_ids.includes(s.id)) state.product.biotex_specialty_ids.push(s.id); state.product.biotex_main_specialty_id = s.id; }"><t t-esc="s.code"/> <small t-esc="s.name"/></button>
+                                                t-on-click="() => this.toggleSpecialty(s)" t-on-dblclick="() => this.setMainSpecialty(s)"><t t-esc="s.code"/> <small t-esc="s.name"/></button>
                                     </t>
                                 </div>
                             </div>

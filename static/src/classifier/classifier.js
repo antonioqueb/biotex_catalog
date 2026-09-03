@@ -172,6 +172,14 @@ export class BiotexClassifier extends Component {
         if (!ids.includes(this.state.product.biotex_main_equipment_id)) this.state.product.biotex_main_equipment_id = ids[0] || false;
     }
     equipmentLabel(id) { return this.state.equipmentLabels[id] || `#${id}`; }
+    noop() {}
+    clearBrand() { this.state.product.biotex_brand_id = false; }
+    onBrandCode(ev) { this.state.newBrandCode = ev.target.value.toUpperCase(); }
+    setMainEquipment(id) { this.state.product.biotex_main_equipment_id = id; }
+    setMainSpecialty(s) {
+        if (!this.state.product.biotex_specialty_ids.includes(s.id)) this.state.product.biotex_specialty_ids.push(s.id);
+        this.state.product.biotex_main_specialty_id = s.id;
+    }
     toggleSpecialty(s) {
         const ids = this.state.product.biotex_specialty_ids; const i = ids.indexOf(s.id);
         if (i >= 0) ids.splice(i, 1); else ids.push(s.id);
