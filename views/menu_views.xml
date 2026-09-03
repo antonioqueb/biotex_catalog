@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_biotex_products" name="Catálogo" parent="stock.menu_stock_inventory_control" sequence="1" action="action_biotex_products"/>
-    <menuitem id="menu_biotex_classifier" name="Asistente de clasificación" parent="stock.menu_stock_inventory_control" sequence="2"
+    <menuitem id="menu_catalog_root" name="Catálogo" sequence="12" web_icon="biotex_catalog,static/description/icon.svg"
+              groups="biotex_base.group_biotex_delegation"/>
+    <menuitem id="menu_biotex_products" name="Productos" parent="menu_catalog_root" sequence="10" action="action_biotex_products"/>
+    <menuitem id="menu_biotex_classifier" name="Asistente de clasificación" parent="menu_catalog_root" sequence="20"
               action="action_biotex_classifier" groups="biotex_catalog.group_catalog_classifier"/>
-    <menuitem id="menu_biotex_pending" name="Pendientes de clasificar" parent="stock.menu_stock_inventory_control" sequence="3" action="action_biotex_products_pending"/>
-    <menuitem id="menu_biotex_families" name="Grupos y familias" parent="stock.menu_product_in_config_stock" sequence="1"
+    <menuitem id="menu_biotex_pending" name="Pendientes de clasificar" parent="menu_catalog_root" sequence="30" action="action_biotex_products_pending"/>
+    <menuitem id="menu_catalog_config" name="Configuración" parent="menu_catalog_root" sequence="90"/>
+    <menuitem id="menu_biotex_families" name="Grupos y familias" parent="menu_catalog_config" sequence="10"
               action="action_biotex_families" groups="biotex_base.group_biotex_direction"/>
-    <menuitem id="menu_biotex_brands" name="Marcas" parent="stock.menu_product_in_config_stock" sequence="2" action="action_biotex_brand"/>
-    <menuitem id="menu_biotex_equipment" name="Equipos compatibles" parent="stock.menu_product_in_config_stock" sequence="3" action="action_biotex_equipment"/>
+    <menuitem id="menu_biotex_brands" name="Marcas" parent="menu_catalog_config" sequence="20" action="action_biotex_brand"/>
+    <menuitem id="menu_biotex_equipment" name="Equipos compatibles" parent="menu_catalog_config" sequence="30" action="action_biotex_equipment"/>
+
+    <!-- Acceso también desde Inventario -->
+    <menuitem id="menu_stock_catalog" name="Catálogo" parent="stock.menu_stock_inventory_control" sequence="1" action="action_biotex_products"/>
+    <menuitem id="menu_stock_pending" name="Pendientes de clasificar" parent="stock.menu_stock_inventory_control" sequence="2" action="action_biotex_products_pending"/>
 </odoo>
