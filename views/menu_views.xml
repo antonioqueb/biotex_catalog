@@ -12,7 +12,7 @@
     <menuitem id="menu_biotex_families" name="Familias" parent="menu_catalog_config" sequence="10"
               action="action_biotex_families" groups="biotex_base.group_biotex_direction"/>
     <menuitem id="menu_biotex_classifiers" name="Clasificadores" parent="menu_catalog_config" sequence="12"
-              action="action_biotex_classifier" groups="biotex_base.group_biotex_direction"/>
+              action="action_biotex_classifier_list" groups="biotex_base.group_biotex_direction"/>
     <menuitem id="menu_biotex_generics" name="Genéricos" parent="menu_catalog_root" sequence="25" action="action_biotex_generic"/>
     <menuitem id="menu_biotex_specialties" name="Especialidades" parent="menu_catalog_config" sequence="40" action="action_biotex_specialty"/>
     <menuitem id="menu_biotex_subclasses" name="Subclases terapéuticas" parent="menu_catalog_config" sequence="45" action="action_biotex_subclass"/>

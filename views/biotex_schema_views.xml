@@ -90,7 +90,7 @@
                 <group><filter name="group_group" string="Grupo" context="{'group_by': 'group_id'}"/></group></search>
         </field>
     </record>
-    <record id="action_biotex_classifier" model="ir.actions.act_window">
+    <record id="action_biotex_classifier_list" model="ir.actions.act_window">
         <field name="name">Clasificadores</field>
         <field name="res_model">biotex.classifier</field>
         <field name="view_mode">list</field>
