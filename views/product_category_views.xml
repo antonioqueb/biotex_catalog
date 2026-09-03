@@ -43,6 +43,6 @@
         <field name="res_model">product.category</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('biotex_level', 'in', ('group', 'family'))]</field>
-        <field name="context">{'default_parent_id': %(product.product_category_goods)d}</field>
+        <field name="context" eval="{'default_parent_id': ref('product.product_category_goods')}"/>
     </record>
 </odoo>
