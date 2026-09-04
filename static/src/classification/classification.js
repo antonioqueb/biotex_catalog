@@ -186,10 +186,16 @@ export class BiotexClassificationWorkspace extends Component {
         if (!this.classificationComplete) return;
         this.state.busy = true;
         try {
-            const data = await this.orm.call(MODEL, "workspace_set_classification", [this.state.session?.id || false, { ...this.state.pick }]);
+            const p = this.state.pick;
+            // el servidor trabaja con los nombres reales de los campos
+            const vals = { group_id: p.group, family_id: p.family, classifier_id: p.classifier, brand_id: p.brand };
+            const data = await this.orm.call(MODEL, "workspace_set_classification", [this.state.session?.id || false, vals]);
             if (data) {
                 this.applySession(data);
                 await this.runSearch(0);
+            } else {
+                // la clasificación está completa en pantalla: si el servidor no devuelve sesión, algo falló
+                this.notification.add(_t("No se pudo guardar la clasificación. Vuelva a elegir la marca."), { type: "danger" });
             }
         } catch (e) {
             this.notify(e);
