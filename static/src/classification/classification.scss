@@ -386,7 +386,15 @@
 }
 .o_bcw_details_body { display: flex; flex-direction: column; gap: 24px; }
 .o_bcw_review_scroll { max-height: 360px; overflow: auto; scrollbar-gutter: stable; }
-.o_bcw_review_scroll th { position: sticky; top: 0; background: var(--bcw-card); }
+.o_bcw_review_modal .modal-header { padding: 16px 24px; }
+.o_bcw_review_scroll .table > :not(caption) > * > * {
+    color: var(--bcw-ink); background: var(--bcw-card); border-color: var(--bcw-rule);
+    box-shadow: none; padding: 10px;
+}
+.o_bcw_review_scroll th {
+    position: sticky; top: 0; z-index: 1;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+}
 
 .o_bcw_grid {
     display: grid; gap: 24px;

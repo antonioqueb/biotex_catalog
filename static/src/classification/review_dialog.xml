@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="biotex_catalog.ClassificationReviewDialog">
-        <Dialog title="'Revisar y generar claves'" size="'lg'" contentClass="'o_bcw_modal'">
+        <Dialog title="'Revisar y generar claves'" size="'lg'" contentClass="'o_bcw_modal o_bcw_review_modal'">
             <div class="o_bcw_modal_body">
                 <p class="mb-0">Se aplicarán los nombres, unidades y referencias de <strong t-esc="props.preview.count"/> productos. Se conservará su identidad y el historial de clasificación.</p>
                 <t t-if="props.preview.changes.length">

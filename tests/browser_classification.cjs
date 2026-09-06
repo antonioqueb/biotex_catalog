@@ -14,6 +14,10 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
  const page = await browser.newPage();
  const errors = [];
+ const searches = [];
+ page.on('request', (request) => {
+  if (request.url().includes('/workspace_search_products') && request.postData()) searches.push(JSON.parse(request.postData()).params.kwargs);
+ });
  page.on('pageerror', (error) => errors.push(error.message));
  const pass = (name, data = {}) => { checks.push({ name, status: 'passed', ...data }); console.log('PASS', name); };
  const screenshot = (name) => page.screenshot({ path: path.join(output, name + '.png'), fullPage: true });
@@ -67,6 +71,9 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await page.waitForSelector(search, { visible: true });
   await page.type(search, 'UI CLAS');
   await page.waitForFunction(() => document.querySelectorAll('[data-product-id]').length === 20 && document.querySelector('[aria-label="Resultados de búsqueda"]').getAttribute('aria-busy') === 'false');
+  assert.equal(searches.filter((request) => request.query === 'UI CLAS').length, 1);
+  assert.ok(searches.every((request) => request.limit <= 20));
+  pass('Search debounce produces one bounded request for the typed term');
   const searchGeometry = await page.$eval(search, (el) => {
    const icon = el.parentElement.querySelector('.o_bcw_search_icon').getBoundingClientRect();
    return { padding: parseFloat(getComputedStyle(el).paddingInlineStart), iconEnd: icon.right - el.getBoundingClientRect().left };
@@ -85,7 +92,7 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await page.click('[data-product-id] .o_bcw_add');
   await page.waitForFunction((id) => !document.querySelector(`[data-product-id="${id}"]`) && document.querySelectorAll('.o_bcw_table_lines tbody tr').length === 13, {}, firstId);
   pass('D: added product disappears and count increments once');
-  assert.ok(await page.$eval(search, (el) => document.activeElement === el));
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.o_bcw_search_input'));
   await page.waitForFunction(() => document.querySelector('[aria-label="Resultados de búsqueda"]').getAttribute('aria-busy') === 'false');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -122,6 +129,16 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await page.click('.o_bcw_foot .btn-primary');
   await page.waitForSelector('.o_bcw_review_scroll');
   assert.equal(await page.$eval('.o_bcw_modal .modal-footer .btn-primary', (button) => button.disabled), true);
+  const contrast = await page.$eval('.o_bcw_review_scroll td', (cell) => {
+   const luminance = (color) => color.match(/[\d.]+/g).slice(0, 3).map(Number).map((c) => c / 255)
+    .map((c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2)
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+   const style = getComputedStyle(cell);
+   const a = luminance(style.color), b = luminance(style.backgroundColor);
+   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+  assert.ok(contrast >= 4.5);
+  pass('Review table remains readable with the native dark theme', { contrast });
   await screenshot('reclassification-review');
   pass('J: existing codes require explicit review acknowledgement');
   await page.click('.o_bcw_modal .modal-footer .btn-secondary');
