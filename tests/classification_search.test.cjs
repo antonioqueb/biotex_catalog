@@ -113,3 +113,32 @@ test('failed scan addition preserves the entered code', async () => {
     assert.equal(app.state.search.query, 'BARCODE-1');
     assert.equal(app.lines.length, 0);
 });
+
+test('Enter never substitutes a different row if the selected product is no longer available', async () => {
+    let added = false;
+    const { app } = workspace(async () => result(2));
+    app.state.search.selectedId = 1;
+    app.addProduct = async () => { added = true; };
+    await app.onSearchKeydown({ key: 'Enter', preventDefault() {} });
+    assert.equal(added, false);
+});
+
+test('inline edits are saved in order and failures prevent silent confirmation', async () => {
+    const first = deferred();
+    const calls = [];
+    const { app, notifications } = workspace(async (_model, method, _args, kwargs) => {
+        calls.push(method);
+        if (kwargs.vals.new_name === 'First') return first.promise;
+        throw new Error('Invalid unit');
+    });
+    app.saveLine({ id: 10 }, { new_name: 'First' });
+    app.saveLine({ id: 10 }, { uom_id: false });
+    await Promise.resolve();
+    assert.equal(calls.length, 1);
+    first.resolve();
+    await app.saveQueue;
+    assert.equal(calls.length, 2);
+    await app.confirm();
+    assert.equal(calls.length, 2);
+    assert.ok(notifications.some((text) => text.includes('no se pudieron guardar')));
+});

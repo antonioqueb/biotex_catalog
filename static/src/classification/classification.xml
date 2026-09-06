@@ -335,7 +335,7 @@
 </t>
 
 <t t-name="biotex_catalog.LineEditorDialog">
-    <Dialog size="'xl'" contentClass="'o_bcw_modal'">
+    <Dialog size="'xl'" contentClass="'o_bcw_modal'" requestClose.bind="requestClose">
         <t t-set-slot="header">
             <div class="o_bcw_modal_head">
                 <div>

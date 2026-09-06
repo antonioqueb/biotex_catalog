@@ -4,6 +4,11 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
 
+class BiotexEditorDialog extends Dialog {
+    static props = { ...Dialog.props, requestClose: Function };
+    dismiss() { return this.props.requestClose(); }
+}
+
 /**
  * Modal "Editar producto clasificado" de la etapa 3.
  *
@@ -13,7 +18,7 @@ import { _t } from "@web/core/l10n/translation";
  */
 export class BiotexLineEditorDialog extends Component {
     static template = "biotex_catalog.LineEditorDialog";
-    static components = { Dialog };
+    static components = { Dialog: BiotexEditorDialog };
     static props = {
         close: Function,
         lineId: Number,
@@ -164,6 +169,7 @@ export class BiotexLineEditorDialog extends Component {
         }
     }
     requestClose() {
+        if (this.state.saving) return;
         if (this.dirty && !this.props.readonly) {
             this.state.confirmClose = true;
             return;

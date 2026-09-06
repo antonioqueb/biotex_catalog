@@ -10,7 +10,8 @@ class TestClassificationWorkspace(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.operator = new_test_user(cls.env, login='classification_test_operator',
+        test_env = cls.env(context={**cls.env.context, 'no_reset_password': True})
+        cls.operator = new_test_user(test_env, login='classification_test_operator',
                                     groups='biotex_catalog.group_catalog_classifier')
         cls.family = cls.env['product.category'].search([
             ('biotex_level', '=', 'family'), ('biotex_classifier_ids', '!=', False)], limit=1)

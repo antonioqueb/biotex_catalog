@@ -41,6 +41,8 @@ export class BiotexClassificationWorkspace extends Component {
         this.searchVersion = 0;
         this.searchKeyBusy = false;
         this.destroyed = false;
+        this.saveQueue = Promise.resolve();
+        this.lineSaveErrors = new Set();
 
         this.state = useState({
             loading: true,
@@ -287,7 +289,7 @@ export class BiotexClassificationWorkspace extends Component {
             const records = this.state.search.records;
             const record = this.state.scan
                 ? (this.state.search.total === 1 ? records[0] : null)
-                : records.find((r) => r.id === selectedId) || (this.state.search.total === 1 ? records[0] : null);
+                : (selectedId ? records.find((r) => r.id === selectedId) : (this.state.search.total === 1 ? records[0] : null));
             if (record) {
                 await this.addProduct(record, { clearQuery: this.state.scan, query });
             } else {
@@ -360,8 +362,10 @@ export class BiotexClassificationWorkspace extends Component {
         if (this.state.busy || this.confirmed) return;
         this.state.busy = true;
         try {
+            await this.saveQueue;
             const data = await this.orm.call(MODEL, "workspace_remove_line", [[this.state.session.id]], { line_id: line.id });
             this.applySession(data);
+            this.clearLineErrors(line.id);
             await this.runSearch(this.state.search.offset);
         } catch (e) {
             this.notify(e);
@@ -372,12 +376,23 @@ export class BiotexClassificationWorkspace extends Component {
 
     onLineInput(line, field, ev) { line[field] = ev.target.value; }
 
-    async saveLine(line, vals) {
-        try {
-            await this.orm.call(MODEL, "workspace_update_line", [[this.state.session.id]], { line_id: line.id, vals });
-        } catch (e) {
-            this.notify(e);
-        }
+    clearLineErrors(lineId) {
+        for (const key of this.lineSaveErrors) if (key.startsWith(`${lineId}:`)) this.lineSaveErrors.delete(key);
+    }
+
+    saveLine(line, vals) {
+        const sessionId = this.state.session.id;
+        const key = `${line.id}:${Object.keys(vals).sort().join(',')}`;
+        this.saveQueue = this.saveQueue.then(async () => {
+            try {
+                await this.orm.call(MODEL, "workspace_update_line", [[sessionId]], { line_id: line.id, vals });
+                this.lineSaveErrors.delete(key);
+            } catch (e) {
+                this.lineSaveErrors.add(key);
+                this.notify(e);
+            }
+        });
+        return this.saveQueue;
     }
 
     onNameChange(line, ev) {
@@ -392,7 +407,8 @@ export class BiotexClassificationWorkspace extends Component {
         this.saveLine(line, { uom_id: id });
     }
 
-    editLine(line) {
+    async editLine(line) {
+        await this.saveQueue;
         // El modal captura a fondo un producto y devuelve la sesión ya persistida: la etapa 3
         // se refresca sin recargar la pantalla ni perder el contexto de la clasificación.
         this.dialog.add(BiotexLineEditorDialog, {
@@ -400,7 +416,7 @@ export class BiotexClassificationWorkspace extends Component {
             sessionId: this.state.session.id,
             classCode: this.state.session.class_code,
             readonly: this.confirmed,
-            onSaved: (session) => this.applySession(session),
+            onSaved: (session) => { this.applySession(session); this.clearLineErrors(line.id); },
         });
     }
 
@@ -437,6 +453,8 @@ export class BiotexClassificationWorkspace extends Component {
         if (this.state.busy || this.confirmed) return;
         this.state.busy = true;
         try {
+            await this.saveQueue;
+            if (this.lineSaveErrors.size) throw new Error(_t("Corrige los cambios de nombre o unidad que no se pudieron guardar antes de generar claves."));
             const preview = await this.orm.call(MODEL, "workspace_confirmation_preview", [[this.state.session.id]]);
             this.dialog.add(BiotexClassificationReviewDialog, {
                 preview,
@@ -454,7 +472,11 @@ export class BiotexClassificationWorkspace extends Component {
     }
 
     async saveAndExit() {
-        // cada acción ya se guardó en el servidor; salir solo cierra la pantalla
+        await this.saveQueue;
+        if (this.lineSaveErrors.size) {
+            this.notification.add(_t("Hay cambios de nombre o unidad sin guardar. Corrígelos antes de salir."), { type: "warning" });
+            return;
+        }
         this.action.doAction("biotex_catalog.action_biotex_classification_sessions", { clearBreadcrumbs: true });
     }
 
