@@ -6,3 +6,4 @@ from . import product_category
 from . import product_template
 from . import product_product
 from . import biotex_classification
+from . import product_import

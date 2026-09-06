@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_template_import_origin_form" model="ir.ui.view">
+        <field name="name">product.template.import.origin</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Origen de la migración" invisible="not biotex_import_sha256">
+                    <group>
+                        <field name="biotex_import_status"/>
+                        <field name="biotex_import_sha256"/>
+                        <field name="biotex_import_review"/>
+                        <field name="biotex_import_validated_by"/>
+                        <field name="biotex_import_validated_on"/>
+                    </group>
+                    <div class="alert alert-info" role="status">Se conservan las columnas originales, sus fórmulas y las incidencias del archivo. Revise las diferencias antes de habilitar compras o ventas.</div>
+                    <button name="action_validate_import" type="object" string="Confirmar revisión de origen" class="btn-primary"
+                            confirm="¿Validó identidad, presentación, moneda y precios de esta ficha? Las filas de origen se conservarán."
+                            groups="biotex_base.group_biotex_direction" invisible="biotex_import_status == 'validated'"/>
+                    <field name="biotex_import_source" nolabel="1"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -35,7 +35,7 @@ class ProductTemplate(models.Model):
     biotex_package_qty = fields.Float(string='Cantidad por presentación', default=1.0)
 
     # --- identificación ---
-    biotex_reference = fields.Char(string='Referencia del fabricante', index=True, copy=False, help='Identificador primario (regla 1). No se repite.')
+    biotex_reference = fields.Char(string='Referencia del fabricante', index=True, copy=False, help='Referencia externa del fabricante; puede repetirse entre presentaciones o fabricantes.')
     biotex_own_code = fields.Boolean(string='Código propio', compute='_compute_own_code', store=True)
     biotex_model = fields.Char(string='Modelo')
     biotex_manufacturer_id = fields.Many2one('res.partner', string='Fabricante')
@@ -178,12 +178,8 @@ class ProductTemplate(models.Model):
                 raise ValidationError('El clasificador %s no está autorizado para la familia %s (%s).' % (
                     p.biotex_classifier_id.code, p.categ_id.biotex_composite, p.categ_id.biotex_group_id.classifier_axis or ''))
 
-    @api.constrains('biotex_reference')
-    def _check_reference_unique(self):
-        for p in self.filtered('biotex_reference'):
-            dup = self.search([('biotex_reference', '=ilike', p.biotex_reference.strip()), ('id', '!=', p.id)], limit=1)
-            if dup:
-                raise ValidationError('La referencia del fabricante "%s" ya está asignada a "%s".' % (p.biotex_reference, dup.display_name))
+    # Manufacturer references are external identifiers. A shared reference does
+    # not prove identity across manufacturers or presentations (CAT-02).
 
     @api.constrains('biotex_photo_waived')
     def _check_photo_waived(self):
