@@ -147,7 +147,8 @@ def import_catalog(env, filename, operational_prices=False):
         pending = len(source_rows) > 1 or not useful(v[8]) or not useful(v[9]) or v[10] is None
         review_count += int(pending)
         country_code = {'USA':'US', 'INDIA':'IN', 'PAISES BAJOS':'NL', 'MEXICO':'MX',
-                        'DINAMARCA':'DK', 'ALEMANIA':'DE', 'JAPON':'JP', 'CHINA':'CN', 'ESPAÑA':'ES'}.get(text(v[15]).upper())
+                        'DINAMARCA':'DK', 'ALEMANIA':'DE', 'JAPON':'JP', 'CHINA':'CN', 'ESPAÑA':'ES',
+                        'REPUBLICA CHECA':'CZ', 'MALASIA':'MY', 'CANADA':'CA', 'EUA':'US'}.get(text(v[15]).upper())
         country = env['res.country'].search([('code', '=', country_code)], limit=1) if country_code else env['res.country']
         values = {
             'name': v[6], 'biotex_name': v[6], 'default_code': key, 'type': 'consu', 'is_storable': True,
