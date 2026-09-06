@@ -62,7 +62,7 @@
         border-bottom: 1px solid var(--bcw-rule);
         flex: 0 0 auto;
 
-        h1 { font-size: 18px; font-weight: 600; margin: 0; line-height: 1.2; }
+        h1 { font-size: 18px; font-weight: 600; margin: 0; line-height: 1.2; color: var(--bcw-ink); }
         p { font-size: 12px; color: var(--bcw-ink-2); margin: 2px 0 0; }
     }
     .o_bcw_top_titles { flex: 1 1 auto; min-width: 0; }
@@ -106,7 +106,7 @@
         padding: 14px 16px; cursor: pointer; user-select: none;
     }
     .o_bcw_stage_titles { flex: 1 1 auto; min-width: 0; }
-    .o_bcw_stage_titles h2 { font-size: 15px; font-weight: 600; margin: 0; line-height: 1.25; }
+    .o_bcw_stage_titles h2 { font-size: 15px; font-weight: 600; margin: 0; line-height: 1.25; color: var(--bcw-ink); }
     .o_bcw_stage_titles p { font-size: 12px; color: var(--bcw-ink-2); margin: 2px 0 0; }
 
     // indicador circular: el número pesa más que el título
@@ -375,7 +375,7 @@
 }
 .o_bcw_editor_primary { border-color: var(--bcw-active); }
 .o_bcw_editor_heading {
-    h5 { margin: 0; font-size: 15px; font-weight: 600; }
+    h5 { margin: 0; font-size: 15px; font-weight: 600; color: var(--bcw-ink); }
     p { margin: 4px 0 0; color: var(--bcw-ink-2); font-size: 13px; }
 }
 .o_bcw_details_toggle {
