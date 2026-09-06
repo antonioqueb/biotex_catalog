@@ -168,14 +168,14 @@
                                    placeholder="Buscar por nombre, referencia o código..."
                                    t-on-input="onSearchInput" t-on-keydown="onSearchKeydown"/>
                             <button class="o_bcw_scan" t-att-class="{o_bcw_scan_on: state.scan}" t-on-click="toggleScan"
-                                    t-att-aria-pressed="state.scan" aria-label="Modo lector de código de barras"
+                                    t-att-aria-pressed="state.scan ? 'true' : 'false'" aria-label="Modo lector de código de barras"
                                     title="Lector de código de barras: al leer un código con un resultado único, se agrega solo.">
                                 <i class="fa fa-barcode"/>
                             </button>
                         </div>
 
                         <p id="bcw_search_help" class="o_bcw_hint mb-2">Flechas para seleccionar; Enter para agregar. Los productos agregados se consultan en la etapa 3.</p>
-                        <div class="o_bcw_table_wrap" t-ref="searchResults" role="region" aria-label="Resultados de búsqueda" tabindex="0" t-att-aria-busy="state.search.loading">
+                        <div class="o_bcw_table_wrap" t-ref="searchResults" role="region" aria-label="Resultados de búsqueda" tabindex="0" t-att-aria-busy="state.search.loading ? 'true' : 'false'">
                             <table class="o_list_table table-sm o_bcw_table">
                                 <thead>
                                     <tr>
@@ -391,7 +391,7 @@
             </section>
 
             <section class="o_bcw_editor_card" aria-label="Información adicional">
-            <button type="button" class="o_bcw_details_toggle" t-att-aria-expanded="state.detailsOpen"
+            <button type="button" class="o_bcw_details_toggle" t-att-aria-expanded="state.detailsOpen ? 'true' : 'false'"
                     aria-controls="bcw_editor_details" t-on-click="toggleDetails">
                 <i class="fa fa-sliders" aria-hidden="true"/>
                 <div class="o_bcw_editor_heading">
