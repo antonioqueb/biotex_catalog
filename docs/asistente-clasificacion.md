@@ -27,6 +27,7 @@ No se recibió un archivo identificable del mockup antes/después en el espacio 
 - En modo escáner, se exige una sola coincidencia en el conjunto completo, no únicamente en la página visible.
 - Tras agregar se devuelve el foco al buscador. En búsqueda normal se selecciona el texto para poder reemplazarlo; en escaneo se limpia únicamente después del agregado correcto.
 - Un error conserva el texto para corregir o reintentar. Las filas ya agregadas se excluyen también al recibir resultados en el cliente.
+- Los cambios rápidos de nombre y unidad se guardan en orden. Generar claves y Guardar y salir esperan esos cambios y señalan los que no pudieron persistirse.
 
 Se reutilizan `Dialog`, `o_input`, `o_list_table`, botones y utilidades del backend. Los estilos propios se limitan al asistente y sus diálogos. Las tablas personalizadas no se presentan como un `ListRenderer` nativo porque su edición y fuentes de datos son distintas. Referencias: [Dialog de Odoo 19](https://github.com/odoo/odoo/blob/19.0/addons/web/static/src/core/dialog/dialog.xml) y [temporización de Odoo 19](https://github.com/odoo/odoo/blob/19.0/addons/web/static/src/core/utils/timing.js).
 
@@ -73,4 +74,23 @@ Ejecutar con un usuario **Clasificador de catálogo** en una base de pruebas, co
 - Tests Odoo `TestClassificationWorkspace`: exclusión antes de paginar, límites, corrección de última página, confirmación revisada, cambios posteriores a la revisión, trazabilidad y conservación de identidad. Usan un usuario clasificador sin permisos de superusuario.
 - La instalación de pruebas se ejecuta en la copia restaurada; los fixtures de las pruebas de transacción se revierten al finalizar.
 
-Estado de ejecución y evidencia visual: pendiente de completar durante la validación de esta revisión.
+Resultados del 6 de septiembre de 2026, código funcional `3dd9f00`:
+
+| Comprobación | Resultado |
+|---|---|
+| JavaScript, métodos reales con servicios simulados | 9 pruebas aprobadas. |
+| Odoo 19, usuario clasificador en la base restaurada | 6 casos funcionales aprobados; el runner informa además dos operaciones de preparación. |
+| Navegador Chromium contra Odoo real | 16 comprobaciones aprobadas, sin errores JavaScript. Incluyen los seis defectos reportados, teclado, debounce, validación del modal y contraste. |
+| Integridad de fuentes | Python analizado, XML válido y `git diff --check` sin errores. |
+
+La prueba visual comprobó el encabezado a 1366, 1024 y 390 píxeles. El scroll, edición, teclado y modal se comprobaron en escritorio. Se validó el estilo existente con el tema oscuro nativo; no se afirma una comparación con un mockup no recibido ni una certificación general de accesibilidad.
+
+Evidencia capturada con productos ficticios en `biotex_rules_20260905`:
+
+- [Resumen colapsado, escritorio](evidence/20260906/summary-1366.png) y [ancho reducido](evidence/20260906/summary-390.png).
+- [Resultados con scroll](evidence/20260906/search-results-scrolled.png) y [productos agregados con encabezados fijos](evidence/20260906/added-products-scrolled.png).
+- [Modal con datos principales](evidence/20260906/editor-main.png) y [datos adicionales desplegados](evidence/20260906/editor-expanded.png).
+- [Revisión de referencias antes de confirmar](evidence/20260906/reclassification-review.png).
+- [Resultados y mediciones del navegador](evidence/20260906/browser-results.json).
+
+Para repetir la prueba de navegador, use `tests/browser_classification.cjs` con Puppeteer, un archivo de credenciales exclusivo de la base restaurada y un directorio de evidencia. Las credenciales no se incluyen en el repositorio. El script exige la base de pruebas y usa el puerto local 18069 a través del túnel SSH.

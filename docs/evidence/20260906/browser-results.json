@@ -1,0 +1,81 @@
+{
+  "checks": [
+    {
+      "name": "Workspace mounted for classifier",
+      "status": "passed",
+      "session_id": 26
+    },
+    {
+      "name": "A: collapsed summary remains inside card at 1366px",
+      "status": "passed"
+    },
+    {
+      "name": "A: collapsed summary remains inside card at 1024px",
+      "status": "passed"
+    },
+    {
+      "name": "A: collapsed summary remains inside card at 390px",
+      "status": "passed"
+    },
+    {
+      "name": "E: added products scroll with sticky headers",
+      "status": "passed",
+      "height": 358,
+      "total": 501,
+      "sticky": true
+    },
+    {
+      "name": "Search debounce produces one bounded request for the typed term",
+      "status": "passed"
+    },
+    {
+      "name": "B: search text clears the permanently visible icon",
+      "status": "passed",
+      "padding": 40,
+      "iconEnd": 28
+    },
+    {
+      "name": "C: search results scroll with a bounded page",
+      "status": "passed",
+      "height": 358,
+      "total": 813,
+      "sticky": true
+    },
+    {
+      "name": "D: added product disappears and count increments once",
+      "status": "passed"
+    },
+    {
+      "name": "G: keyboard selection and Enter add the selected row",
+      "status": "passed"
+    },
+    {
+      "name": "F: modal uses shared controls and collapsed optional details",
+      "status": "passed",
+      "radius": "8px",
+      "shadow": "rgba(124, 58, 237, 0.12) 0px 0px 0px 3px"
+    },
+    {
+      "name": "M: optional validation error reopens its section",
+      "status": "passed"
+    },
+    {
+      "name": "Modal Escape preserves unsaved edits",
+      "status": "passed"
+    },
+    {
+      "name": "Review table remains readable with the native dark theme",
+      "status": "passed",
+      "contrast": 11.616303733779208
+    },
+    {
+      "name": "J: existing codes require explicit review acknowledgement",
+      "status": "passed"
+    },
+    {
+      "name": "Review cancelled without applying product changes",
+      "status": "passed"
+    }
+  ],
+  "errors": []
+}
