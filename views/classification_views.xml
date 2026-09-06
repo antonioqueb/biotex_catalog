@@ -35,9 +35,8 @@
                 <header>
                     <button name="action_open_workspace" type="object" string="Abrir asistente" class="btn-primary"
                             invisible="state != 'draft'"/>
-                    <button name="action_confirm" type="object" string="Generar claves" class="btn-primary"
-                            invisible="state != 'draft' or line_count == 0"
-                            confirm="Se escribirá la clave definitiva en cada producto de la lista. ¿Continuar?"/>
+                    <button name="action_open_workspace" type="object" string="Revisar y generar claves" class="btn-primary"
+                            invisible="state != 'draft' or line_count == 0"/>
                     <button name="action_cancel" type="object" string="Cancelar sesión" invisible="state != 'draft'"/>
                     <button name="action_draft" type="object" string="Volver a borrador" invisible="state != 'cancelled'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
@@ -78,6 +77,19 @@
                                     <field name="reference" readonly="1"/>
                                     <field name="consecutive" readonly="1"/>
                                     <field name="state" readonly="1" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Historial de clasificación" invisible="state != 'confirmed'">
+                            <field name="line_ids" readonly="1">
+                                <list create="0" edit="0" delete="0">
+                                    <field name="product_id"/>
+                                    <field name="applied_reference_before"/>
+                                    <field name="applied_reference_after"/>
+                                    <field name="applied_classification_before" optional="show"/>
+                                    <field name="applied_classification_after" optional="show"/>
+                                    <field name="applied_by_id"/>
+                                    <field name="applied_on"/>
                                 </list>
                             </field>
                         </page>

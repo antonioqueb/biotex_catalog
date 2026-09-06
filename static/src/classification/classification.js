@@ -1,14 +1,15 @@
 /** @odoo-module **/
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, useRef, onWillStart, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
 import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { BiotexLineEditorDialog } from "./line_editor";
+import { BiotexClassificationReviewDialog } from "./review_dialog";
 
 const MODEL = "biotex.classification.session";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 /**
  * Los cuatro niveles de la clasificación, en el orden en que se eligen.
@@ -35,6 +36,11 @@ export class BiotexClassificationWorkspace extends Component {
         this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.levels = LEVELS;
+        this.searchInput = useRef("productSearch");
+        this.searchResults = useRef("searchResults");
+        this.searchVersion = 0;
+        this.searchKeyBusy = false;
+        this.destroyed = false;
 
         this.state = useState({
             loading: true,
@@ -49,7 +55,7 @@ export class BiotexClassificationWorkspace extends Component {
             brandHints: [],
             stage: 1,
             collapsed: { 1: false, 2: false },
-            search: { query: "", offset: 0, total: 0, records: [], loading: false },
+            search: { query: "", offset: 0, total: 0, records: [], loading: false, selectedId: null },
             scan: false,
             busy: false,
             dragId: null,
@@ -57,6 +63,7 @@ export class BiotexClassificationWorkspace extends Component {
         });
 
         this.debouncedSearch = useDebounced(() => this.runSearch(0), 300);
+        onWillUnmount(() => { this.destroyed = true; this.searchVersion++; });
 
         onWillStart(async () => {
             const sessionId = this.props.action?.context?.biotex_session_id || null;
@@ -66,6 +73,7 @@ export class BiotexClassificationWorkspace extends Component {
 
     // ================================================================= carga
     async bootstrap(sessionId) {
+        this.searchVersion++;
         const data = await this.orm.call(MODEL, "workspace_bootstrap", [sessionId]);
         Object.assign(this.state, { tree: data.tree, brands: data.brands, uoms: data.uoms, drafts: data.drafts, loading: false });
         this.applySession(data.session);
@@ -244,70 +252,117 @@ export class BiotexClassificationWorkspace extends Component {
     // ================================================================= etapa 2: búsqueda
     onSearchInput(ev) {
         this.state.search.query = ev.target.value;
+        // Invalidate immediately, including during the debounce window.
+        this.searchVersion++;
+        this.state.search.records = [];
+        this.state.search.selectedId = null;
+        this.state.search.total = 0;
+        this.state.search.offset = 0;
+        this.state.search.loading = true;
         this.debouncedSearch();
     }
 
     /** Un lector de código de barras es un teclado: escribe y manda Enter. Aquí lo aprovechamos. */
     async onSearchKeydown(ev) {
+        if (ev.isComposing || ev.repeat) return;
+        if (["ArrowDown", "ArrowUp"].includes(ev.key)) {
+            ev.preventDefault();
+            const records = this.state.search.records;
+            if (!records.length || this.state.search.loading) return;
+            const index = records.findIndex((r) => r.id === this.state.search.selectedId);
+            const next = index < 0 ? 0 : Math.max(0, Math.min(records.length - 1, index + (ev.key === "ArrowDown" ? 1 : -1)));
+            this.state.search.selectedId = records[next].id;
+            this.searchResults.el?.querySelector(`[data-product-id="${records[next].id}"]`)?.scrollIntoView({ block: "nearest" });
+            return;
+        }
         if (ev.key !== "Enter") return;
         ev.preventDefault();
-        await this.runSearch(0);
-        if (this.state.scan && this.state.search.records.length === 1 && !this.state.search.records[0].added) {
-            await this.addProduct(this.state.search.records[0]);
-            this.state.search.query = "";
-            ev.target.value = "";
+        if (this.searchKeyBusy || this.state.busy || this.confirmed) return;
+        this.searchKeyBusy = true;
+        this.debouncedSearch.cancel();
+        try {
+            const query = this.state.search.query;
+            const selectedId = this.state.search.selectedId;
+            if (!await this.runSearch(this.state.search.offset)) return;
+            const records = this.state.search.records;
+            const record = this.state.scan
+                ? (this.state.search.total === 1 ? records[0] : null)
+                : records.find((r) => r.id === selectedId) || (this.state.search.total === 1 ? records[0] : null);
+            if (record) {
+                await this.addProduct(record, { clearQuery: this.state.scan, query });
+            } else {
+                this.notification.add(_t("Selecciona un resultado con las flechas y pulsa Enter para agregarlo."), { type: "info" });
+            }
+        } finally {
+            this.searchKeyBusy = false;
         }
     }
 
-    toggleScan() { this.state.scan = !this.state.scan; }
+    toggleScan() { this.state.scan = !this.state.scan; this.searchInput.el?.focus(); }
 
     async runSearch(offset) {
-        if (!this.state.session) return;
+        if (!this.state.session || this.destroyed) return false;
+        const version = ++this.searchVersion;
+        const sessionId = this.state.session.id;
+        const query = this.state.search.query;
         this.state.search.loading = true;
         try {
-            const res = await this.orm.call(MODEL, "workspace_search_products", [[this.state.session.id]], {
-                query: this.state.search.query, offset, limit: PAGE_SIZE,
+            const res = await this.orm.call(MODEL, "workspace_search_products", [[sessionId]], {
+                query, offset, limit: PAGE_SIZE,
             });
-            Object.assign(this.state.search, { records: res.records, total: res.total, offset: res.offset });
+            if (this.destroyed || version !== this.searchVersion || sessionId !== this.state.session?.id) return false;
+            const addedIds = new Set(this.lines.map((line) => line.product_id));
+            const records = res.records.filter((record) => !addedIds.has(record.id));
+            Object.assign(this.state.search, { records, total: res.total, offset: res.offset,
+                selectedId: records.some((r) => r.id === this.state.search.selectedId) ? this.state.search.selectedId : null });
+            return true;
         } catch (e) {
-            this.notify(e);
+            if (version === this.searchVersion && !this.destroyed) this.notify(e);
+            return false;
         } finally {
-            this.state.search.loading = false;
+            if (version === this.searchVersion && !this.destroyed) this.state.search.loading = false;
         }
     }
 
     get pageFrom() { return this.state.search.total ? this.state.search.offset + 1 : 0; }
-    get pageTo() { return Math.min(this.state.search.offset + PAGE_SIZE, this.state.search.total); }
+    get pageTo() { return this.state.search.offset + this.state.search.records.length; }
     get hasPrevPage() { return this.state.search.offset > 0; }
     get hasNextPage() { return this.pageTo < this.state.search.total; }
     prevPage() { this.runSearch(Math.max(0, this.state.search.offset - PAGE_SIZE)); }
     nextPage() { this.runSearch(this.state.search.offset + PAGE_SIZE); }
 
-    async addProduct(record) {
-        if (record.added || this.state.busy) return;
+    async addProduct(record, { clearQuery = false, query = this.state.search.query } = {}) {
+        if (this.confirmed || this.state.busy || this.lines.some((line) => line.product_id === record.id)) return false;
         this.state.busy = true;
+        this.searchVersion++;
         try {
             const data = await this.orm.call(MODEL, "workspace_add_products", [[this.state.session.id]], { product_ids: [record.id] });
             this.applySession(data);
-            record.added = true;
+            this.state.search.records = this.state.search.records.filter((r) => r.id !== record.id);
+            this.state.search.selectedId = null;
+            if (clearQuery && this.state.search.query === query) this.state.search.query = "";
+            await this.runSearch(this.state.search.offset);
             if (this.state.stage === 2 && this.lines.length === 1) {
                 this.notification.add(_t("Producto agregado. Ya puede revisarlo en la etapa 3."), { type: "success" });
             }
+            return true;
         } catch (e) {
             this.notify(e);
         } finally {
             this.state.busy = false;
+            this.searchInput.el?.focus();
+            if (!clearQuery && this.state.search.query === query) this.searchInput.el?.select();
         }
     }
 
     // ================================================================= etapa 3: lista de trabajo
     async removeLine(line) {
+        if (this.state.busy || this.confirmed) return;
         this.state.busy = true;
         try {
             const data = await this.orm.call(MODEL, "workspace_remove_line", [[this.state.session.id]], { line_id: line.id });
             this.applySession(data);
-            const record = this.state.search.records.find((r) => r.id === line.product_id);
-            if (record) record.added = false;
+            await this.runSearch(this.state.search.offset);
         } catch (e) {
             this.notify(e);
         } finally {
@@ -378,24 +433,24 @@ export class BiotexClassificationWorkspace extends Component {
     onDragEnd() { Object.assign(this.state, { dragId: null, overId: null }); }
 
     // ================================================================= cierre
-    confirm() {
-        this.dialog.add(ConfirmationDialog, {
-            title: _t("Generar claves"),
-            body: _t("Se escribirá la clave definitiva en %s producto(s) y se aplicarán los nombres y unidades de esta lista. Esta acción no se deshace.", this.lines.length),
-            confirmLabel: _t("Generar claves"),
-            confirm: async () => {
-                this.state.busy = true;
-                try {
-                    const data = await this.orm.call(MODEL, "workspace_confirm", [[this.state.session.id]]);
+    async confirm() {
+        if (this.state.busy || this.confirmed) return;
+        this.state.busy = true;
+        try {
+            const preview = await this.orm.call(MODEL, "workspace_confirmation_preview", [[this.state.session.id]]);
+            this.dialog.add(BiotexClassificationReviewDialog, {
+                preview,
+                onConfirm: async () => {
+                    const data = await this.orm.call(MODEL, "workspace_confirm", [[this.state.session.id]], { expected_revision: preview.revision });
                     this.applySession(data);
                     this.notification.add(_t("%s producto(s) clasificados.", this.lines.length), { type: "success" });
-                } catch (e) {
-                    this.notify(e);
-                } finally {
-                    this.state.busy = false;
-                }
-            },
-        });
+                },
+            });
+        } catch (e) {
+            this.notify(e);
+        } finally {
+            this.state.busy = false;
+        }
     }
 
     async saveAndExit() {

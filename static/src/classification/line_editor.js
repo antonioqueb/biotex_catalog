@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, useRef, onWillStart, onMounted } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
@@ -26,6 +26,7 @@ export class BiotexLineEditorDialog extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.nameInput = useRef("editorName");
         this.state = useState({
             loading: true,
             line: {},
@@ -37,8 +38,10 @@ export class BiotexLineEditorDialog extends Component {
             errors: {},
             saving: false,
             confirmClose: false,
+            detailsOpen: false,
             lookups: { manufacturer: [], distributor: [], equipment: [] },
         });
+        onMounted(() => this.nameInput.el?.focus());
         onWillStart(async () => {
             const data = await this.orm.call("biotex.classification.session", "workspace_line_detail", [
                 [this.props.sessionId], this.props.lineId,
@@ -77,6 +80,7 @@ export class BiotexLineEditorDialog extends Component {
     }
 
     // ------------------------------------------------------------------ estado
+    toggleDetails() { this.state.detailsOpen = !this.state.detailsOpen; }
     get dirty() {
         return Object.keys(this.state.initial).some((k) => this.state.draft[k] !== this.state.initial[k]);
     }
@@ -136,12 +140,13 @@ export class BiotexLineEditorDialog extends Component {
         const qty = this.state.draft.package_qty;
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
         this.state.errors = errors;
+        if (errors.package_qty) this.state.detailsOpen = true;
         return !Object.keys(errors).length;
     }
 
     // ------------------------------------------------------------------ guardar / cancelar
     async save() {
-        if (this.props.readonly || !this.validate()) return;
+        if (this.props.readonly || this.state.saving || !this.validate()) return;
         this.state.saving = true;
         try {
             const vals = { ...this.state.draft };

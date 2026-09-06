@@ -16,7 +16,12 @@ Reglas de la iteración 1:
   (grupo · marca · familia · clasificador · consecutivo), el mismo que produce
   `product.template.action_assign_clave`.
 """
+import hashlib
+import json
+
+from markupsafe import Markup
 from odoo import api, fields, models
+from odoo.tools import SQL
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Domain
 
@@ -87,6 +92,16 @@ class BiotexClassificationSession(models.Model):
                     session.classifier_id.code, session.family_id.biotex_composite))
 
     # ------------------------------------------------------------------ consecutivos
+    def _lock_workspace(self):
+        if not self:
+            return
+        self.check_access('write')
+        self.env.cr.execute(SQL('SELECT id FROM biotex_classification_session WHERE id IN %s ORDER BY id FOR UPDATE', tuple(self.ids)))
+        # Touch the row so concurrent RPCs retry under Odoo's repeatable-read isolation,
+        # including when only child rows change (add/remove/edit).
+        self.env.cr.execute(SQL('UPDATE biotex_classification_session SET write_date = write_date WHERE id IN %s', tuple(self.ids)))
+        self.invalidate_recordset()
+
     def _next_consecutive(self):
         """Primer consecutivo libre del prefijo: mira las claves ya escritas y las reservadas por otras sesiones."""
         self.ensure_one()
@@ -117,19 +132,51 @@ class BiotexClassificationSession(models.Model):
             'context': {'biotex_session_id': self.id},
         }
 
-    def action_confirm(self):
+    def action_confirm(self, expected_revision=None):
         """Escribe la clasificación, el nombre, la unidad y la referencia definitiva en cada producto."""
         for session in self:
+            session._lock_workspace()
             if session.state != 'draft':
                 raise UserError('La sesión %s ya no está en borrador.' % session.name)
             if not session.complete:
                 raise UserError('Complete la clasificación (grupo, familia, clasificador y marca) antes de generar las claves.')
             if not session.line_ids:
                 raise UserError('Agregue al menos un producto antes de generar las claves.')
+            products = session.line_ids.product_id
+            products.check_access('write')
+            self.env.cr.execute(SQL('SELECT id FROM product_template WHERE id IN %s ORDER BY id FOR UPDATE', tuple(products.ids)))
+            self.env.cr.execute(SQL('SELECT id FROM product_product WHERE product_tmpl_id IN %s ORDER BY id FOR UPDATE', tuple(products.ids)))
+            products.invalidate_recordset()
+            products.product_variant_ids.invalidate_recordset()
+            preview = session.workspace_confirmation_preview()
+            if expected_revision and expected_revision != preview['revision']:
+                raise UserError('La sesión o un producto cambió desde la revisión. Abra de nuevo Generar claves y revise las referencias actuales.')
+            if preview['changes'] and not expected_revision:
+                raise UserError('Hay referencias existentes que cambiarán. Abra el asistente y revise la clasificación anterior y nueva antes de confirmar.')
             for line in session.line_ids:
                 line._apply()
-            session.state = 'confirmed'
+            super(BiotexClassificationSession, session).write({'state': 'confirmed'})
         return True
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if any(vals.get('state', 'draft') != 'draft' for vals in vals_list):
+            raise UserError('Cree la sesión en borrador y confirme desde el asistente.')
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._lock_workspace()
+        if any(session.state == 'confirmed' for session in self):
+            raise UserError('La sesión confirmada conserva su historial. Cree una nueva sesión para reclasificar.')
+        if vals.get('state') == 'confirmed':
+            raise UserError('Use Generar claves para confirmar la sesión.')
+        return super().write(vals)
+
+    def unlink(self):
+        self._lock_workspace()
+        if any(session.state == 'confirmed' for session in self):
+            raise UserError('No se elimina una clasificación confirmada.')
+        return super().unlink()
 
     def action_cancel(self):
         for session in self:
@@ -186,6 +233,8 @@ class BiotexClassificationSession(models.Model):
                 return None  # todavía no hay nada que persistir
             session = self.create(clean)
         else:
+            session._lock_workspace()
+            session._check_editable()
             previous = session.class_code
             session.write(clean)
             if session.class_code != previous and session.line_ids:
@@ -196,10 +245,13 @@ class BiotexClassificationSession(models.Model):
                     session.line_ids.consecutive = 0
         return session._workspace_session()
 
-    def workspace_search_products(self, query='', offset=0, limit=10):
+    def workspace_search_products(self, query='', offset=0, limit=20):
         """Búsqueda paginada por nombre, clave, referencia de fabricante, código de barras o sinónimo."""
         self.ensure_one()
-        domain = Domain.TRUE
+        self.check_access('read')
+        limit = max(1, min(int(limit), 20))
+        offset = max(0, int(offset))
+        domain = Domain('id', 'not in', self.line_ids.product_id.ids)
         query = (query or '').strip()
         if query:
             domain &= (Domain('name', 'ilike', query) | Domain('default_code', 'ilike', query)
@@ -208,8 +260,9 @@ class BiotexClassificationSession(models.Model):
                        | Domain('biotex_synonym_ids.name', 'ilike', query))
         Product = self.env['product.template']
         total = Product.search_count(domain)
-        products = Product.search(domain, offset=offset, limit=limit, order='name')
-        added = set(self.line_ids.product_id.ids)
+        # Removing the last row of the last page must not leave an empty, inaccessible page.
+        offset = min(offset, ((total - 1) // limit) * limit) if total else 0
+        products = Product.search(domain, offset=offset, limit=limit, order='name, id')
         return {
             'total': total,
             'offset': offset,
@@ -220,17 +273,19 @@ class BiotexClassificationSession(models.Model):
                 'default_code': p.default_code or '',
                 'reference': p.biotex_reference or p.barcode or '',
                 'brand': p.biotex_brand_id.name or '',
-                'added': p.id in added,
             } for p in products],
         }
 
     def workspace_add_products(self, product_ids):
         self.ensure_one()
+        self._lock_workspace()
         self._check_editable()
         existing = set(self.line_ids.product_id.ids)
         sequence = max(self.line_ids.mapped('sequence') or [0])
         Line = self.env['biotex.classification.session.line']
-        for product in self.env['product.template'].browse([pid for pid in product_ids if pid not in existing]):
+        products = self.env['product.template'].browse(list(dict.fromkeys(pid for pid in product_ids if pid not in existing))).exists()
+        products.check_access('read')
+        for product in products:
             sequence += 10
             Line.create({
                 'session_id': self.id,
@@ -238,6 +293,7 @@ class BiotexClassificationSession(models.Model):
                 'sequence': sequence,
                 'consecutive': self._next_consecutive(),
                 'old_name': product.name,
+                'old_reference': product.default_code or '',
                 'new_name': product.name,
                 'uom_id': product.uom_id.id,
                 'measure': product.biotex_measure,
@@ -360,9 +416,26 @@ class BiotexClassificationSession(models.Model):
             [('categ_id', '=', family_id), ('biotex_classifier_id', '=', classifier_id)]
         ).biotex_brand_id.ids
 
-    def workspace_confirm(self):
+    def workspace_confirmation_preview(self):
+        """Current values, rather than the potentially stale values captured when adding a product."""
         self.ensure_one()
-        self.action_confirm()
+        self.check_access('read')
+        self._check_editable()
+        changes = []
+        version = [self.class_code, self.company_id.id]
+        for line in self.line_ids.sorted('id'):
+            product = line.product_id
+            previous = product.default_code or ''
+            if previous and previous != line.reference:
+                changes.append({'id': product.id, 'name': product.name, 'before': previous, 'after': line.reference})
+            version.append([line._workspace_detail(), previous, str(product.write_date),
+                            product.name, product.uom_id.id, line._classification_description(product)])
+        return {'revision': hashlib.sha256(json.dumps(version).encode()).hexdigest(),
+                'count': len(self.line_ids), 'changes': changes}
+
+    def workspace_confirm(self, expected_revision=None):
+        self.ensure_one()
+        self.action_confirm(expected_revision=expected_revision)
         return self._workspace_session()
 
     def workspace_discard(self):
@@ -388,6 +461,13 @@ class BiotexClassificationSessionLine(models.Model):
     sequence = fields.Integer(string='Orden', default=10, index=True)
     product_id = fields.Many2one('product.template', string='Producto', required=True, ondelete='cascade', index=True)
     old_name = fields.Char(string='Nombre anterior', readonly=True, help='Nombre que tenía el producto al agregarlo a la sesión.')
+    old_reference = fields.Char(string='Referencia al agregar', readonly=True)
+    applied_reference_before = fields.Char(string='Referencia anterior', readonly=True, copy=False)
+    applied_reference_after = fields.Char(string='Referencia aplicada', readonly=True, copy=False)
+    applied_classification_before = fields.Char(string='Clasificación anterior', readonly=True, copy=False)
+    applied_classification_after = fields.Char(string='Clasificación aplicada', readonly=True, copy=False)
+    applied_by_id = fields.Many2one('res.users', string='Aplicó', readonly=True, copy=False, ondelete='restrict')
+    applied_on = fields.Datetime(string='Fecha de aplicación', readonly=True, copy=False)
     new_name = fields.Char(string='Nombre actual')
     uom_id = fields.Many2one('uom.uom', string='Unidad de medida')
     consecutive = fields.Integer(string='Consecutivo', readonly=True, copy=False,
@@ -414,6 +494,32 @@ class BiotexClassificationSessionLine(models.Model):
 
     DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'brand_id', 'manufacturer_ref', 'model',
                      'barcode', 'country_id', 'manufacturer_id', 'distributor_id', 'equipment_id', 'specialty_id', 'notes')
+    AUDIT_FIELDS = ('applied_reference_before', 'applied_reference_after', 'applied_classification_before',
+                   'applied_classification_after', 'applied_by_id', 'applied_on')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        sessions = self.env['biotex.classification.session'].browse(list({v['session_id'] for v in vals_list}))
+        sessions._lock_workspace()
+        for session in sessions:
+            session._check_editable()
+        if any(set(vals) & set(self.AUDIT_FIELDS) or vals.get('state', 'draft') != 'draft' for vals in vals_list):
+            raise UserError('El historial de aplicación se registra al confirmar.')
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self.session_id._lock_workspace()
+        if any(line.state == 'applied' or line.session_id.state != 'draft' for line in self):
+            raise UserError('Conserve la línea aplicada en su sesión original.')
+        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name'}):
+            raise UserError('La identidad y el historial de la línea no se modifican manualmente.')
+        return super().write(vals)
+
+    def unlink(self):
+        self.session_id._lock_workspace()
+        if any(line.state == 'applied' or line.session_id.state == 'confirmed' for line in self):
+            raise UserError('No se elimina una línea de clasificación aplicada.')
+        return super().unlink()
 
     @api.constrains('package_qty')
     def _check_package_qty(self):
@@ -444,6 +550,7 @@ class BiotexClassificationSessionLine(models.Model):
             'product_id': self.product_id.id,
             'sequence': self.sequence,
             'old_name': self.old_name or '',
+            'old_reference': self.old_reference or '',
             'new_name': self.new_name or '',
             'uom_id': self.uom_id.id or False,
             'uom_name': self.uom_id.name or '',
@@ -487,6 +594,8 @@ class BiotexClassificationSessionLine(models.Model):
         self.ensure_one()
         session = self.session_id
         product = self.product_id
+        previous_reference = product.default_code or ''
+        previous_classification = self._classification_description(product)
         vals = {
             'categ_id': session.family_id.id,
             'biotex_classifier_id': session.classifier_id.id,
@@ -518,4 +627,24 @@ class BiotexClassificationSessionLine(models.Model):
             vals['biotex_main_specialty_id'] = self.specialty_id.id
             vals['biotex_specialty_ids'] = [(4, self.specialty_id.id)]
         product.write(vals)
-        self.state = 'applied'
+        applied_on = fields.Datetime.now()
+        current_classification = self._classification_description(product)
+        super(BiotexClassificationSessionLine, self).write({
+            'state': 'applied', 'applied_reference_before': previous_reference,
+            'applied_reference_after': product.default_code or '',
+            'applied_classification_before': previous_classification,
+            'applied_classification_after': current_classification,
+            'applied_by_id': self.env.uid, 'applied_on': applied_on,
+        })
+        product.message_post(body=Markup(
+            '<p>Clasificación aplicada desde la sesión %s.</p>'
+            '<p>Referencia: %s → %s</p><p>Clasificación: %s → %s</p>'
+            '<p>Responsable: %s · Fecha (UTC): %s</p>'
+        ) % (session.name, previous_reference or 'Sin referencia', product.default_code or '',
+             previous_classification, current_classification, self.env.user.display_name, applied_on),
+            subtype_xmlid='mail.mt_note')
+
+    def _classification_description(self, product):
+        return ' / '.join(value or 'Sin asignar' for value in (
+            product.biotex_group_id.display_name, product.biotex_brand_id.display_name,
+            product.categ_id.display_name, product.biotex_classifier_id.display_name))

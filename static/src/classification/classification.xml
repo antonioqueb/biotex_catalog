@@ -161,18 +161,22 @@
                     <div t-if="!stageReachable(2)" class="o_bcw_empty">Completa la clasificación de la etapa 1 para buscar productos.</div>
                     <t t-else="">
                         <div class="o_bcw_searchbar">
-                            <i class="fa fa-search o_bcw_search_icon"/>
-                            <input type="text" class="o_bcw_input o_bcw_search_input"
+                            <i class="fa fa-search o_bcw_search_icon" aria-hidden="true"/>
+                            <input type="text" class="o_input o_bcw_input o_bcw_search_input" t-ref="productSearch"
+                                   t-att-value="state.search.query" t-att-readonly="confirmed"
+                                   aria-label="Buscar productos" aria-describedby="bcw_search_help" autocomplete="off"
                                    placeholder="Buscar por nombre, referencia o código..."
                                    t-on-input="onSearchInput" t-on-keydown="onSearchKeydown"/>
                             <button class="o_bcw_scan" t-att-class="{o_bcw_scan_on: state.scan}" t-on-click="toggleScan"
+                                    t-att-aria-pressed="state.scan" aria-label="Modo lector de código de barras"
                                     title="Lector de código de barras: al leer un código con un resultado único, se agrega solo.">
                                 <i class="fa fa-barcode"/>
                             </button>
                         </div>
 
-                        <div class="o_bcw_table_wrap">
-                            <table class="o_bcw_table">
+                        <p id="bcw_search_help" class="o_bcw_hint mb-2">Flechas para seleccionar; Enter para agregar. Los productos agregados se consultan en la etapa 3.</p>
+                        <div class="o_bcw_table_wrap" t-ref="searchResults" role="region" aria-label="Resultados de búsqueda" tabindex="0" t-att-aria-busy="state.search.loading">
+                            <table class="o_list_table table-sm o_bcw_table">
                                 <thead>
                                     <tr>
                                         <th>Producto</th>
@@ -182,14 +186,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr t-foreach="state.search.records" t-as="record" t-key="record.id" t-att-class="{o_bcw_row_added: record.added}">
+                                    <tr t-foreach="state.search.records" t-as="record" t-key="record.id" t-att-data-product-id="record.id"
+                                        t-att-class="{o_bcw_row_selected: state.search.selectedId === record.id}">
                                         <td class="o_bcw_cell_name"><t t-esc="record.name"/></td>
                                         <td class="o_bcw_mono"><t t-esc="record.default_code or record.reference or '—'"/></td>
                                         <td><t t-esc="record.brand or '—'"/></td>
                                         <td class="o_bcw_w_act">
-                                            <span t-if="record.added" class="o_bcw_chip o_bcw_chip_ok"><i class="fa fa-check"/> Agregado</span>
-                                            <button t-else="" class="o_bcw_add" t-on-click="() => this.addProduct(record)"
-                                                    t-att-disabled="confirmed" title="Agregar a la clasificación">
+                                            <button class="o_bcw_add" t-on-click="() => this.addProduct(record)"
+                                                    t-att-disabled="confirmed or state.busy or state.search.loading" t-att-aria-label="'Agregar ' + record.name" title="Agregar a la clasificación">
                                                 <i class="fa fa-plus"/> Agregar
                                             </button>
                                         </td>
@@ -205,12 +209,12 @@
                         </div>
 
                         <div class="o_bcw_pager">
-                            <span class="o_bcw_pager_text">
+                            <span class="o_bcw_pager_text" role="status" aria-live="polite">
                                 Mostrando <t t-esc="pageFrom"/> a <t t-esc="pageTo"/> de <t t-esc="state.search.total"/> resultados
                             </span>
                             <div class="o_bcw_pager_btns">
-                                <button class="o_bcw_icon_btn" t-att-disabled="!hasPrevPage" t-on-click="prevPage"><i class="fa fa-angle-left"/></button>
-                                <button class="o_bcw_icon_btn" t-att-disabled="!hasNextPage" t-on-click="nextPage"><i class="fa fa-angle-right"/></button>
+                                <button class="o_bcw_icon_btn" t-att-disabled="!hasPrevPage or state.search.loading or state.busy" t-on-click="prevPage" aria-label="Página anterior"><i class="fa fa-angle-left"/></button>
+                                <button class="o_bcw_icon_btn" t-att-disabled="!hasNextPage or state.search.loading or state.busy" t-on-click="nextPage" aria-label="Página siguiente"><i class="fa fa-angle-right"/></button>
                             </div>
                         </div>
                     </t>
@@ -235,7 +239,7 @@
                                 </t>
                             </span>
                         </div>
-                        <div class="o_bcw_meta_line o_bcw_muted">Productos agregados: <strong t-esc="lines.length"/></div>
+                        <div class="o_bcw_meta_line o_bcw_muted" role="status" aria-live="polite">Productos agregados: <strong t-esc="lines.length"/></div>
                     </div>
                 </header>
 
@@ -253,8 +257,8 @@
                     <div t-if="!lines.length" class="o_bcw_empty">Todavía no hay productos en esta clasificación. Agrégalos desde la etapa 2.</div>
 
                     <t t-else="">
-                        <div class="o_bcw_table_wrap">
-                            <table class="o_bcw_table o_bcw_table_lines">
+                        <div class="o_bcw_table_wrap" role="region" aria-label="Productos agregados" tabindex="0">
+                            <table class="o_list_table table-sm o_bcw_table o_bcw_table_lines">
                                 <thead>
                                     <tr>
                                         <th class="o_bcw_w_grip"/>
@@ -281,13 +285,13 @@
                                         <td class="o_bcw_w_num o_bcw_mono"><t t-esc="line_index + 1"/></td>
                                         <td>
                                             <input type="text" class="o_bcw_input o_bcw_cell_input"
-                                                   t-att-value="line.new_name" t-att-readonly="confirmed"
+                                                   t-att-value="line.new_name" t-att-readonly="confirmed" t-att-aria-label="'Nombre de ' + line.old_name"
                                                    t-on-input="(ev) => this.onLineInput(line, 'new_name', ev)"
                                                    t-on-change="(ev) => this.onNameChange(line, ev)"/>
                                         </td>
                                         <td class="o_bcw_muted"><t t-esc="line.old_name or '—'"/></td>
                                         <td class="o_bcw_w_uom">
-                                            <select class="o_bcw_input o_bcw_cell_input" t-att-disabled="confirmed"
+                                            <select class="o_bcw_input o_bcw_cell_input" t-att-disabled="confirmed" t-att-aria-label="'Unidad de ' + line.old_name"
                                                     t-on-change="(ev) => this.onUomChange(line, ev)">
                                                 <option value="" t-att-selected="!line.uom_id">—</option>
                                                 <option t-foreach="state.uoms" t-as="uom" t-key="uom.id"
@@ -299,7 +303,7 @@
                                         <td class="o_bcw_w_act2">
                                             <button class="o_bcw_icon_btn" t-on-click="() => this.editLine(line)" title="Editar producto clasificado"><i class="fa fa-pencil"/></button>
                                             <button class="o_bcw_icon_btn o_bcw_danger" t-on-click="() => this.removeLine(line)"
-                                                    t-att-disabled="confirmed" title="Quitar de la lista"><i class="fa fa-trash-o"/></button>
+                                                    t-att-disabled="confirmed or state.busy" title="Quitar de la lista"><i class="fa fa-trash-o"/></button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -345,6 +349,11 @@
         <div t-if="state.loading" class="o_bcw_modal_loading"><i class="fa fa-circle-o-notch fa-spin fa-2x"/></div>
 
         <div t-else="" class="o_bcw_modal_body">
+            <section class="o_bcw_editor_card o_bcw_editor_primary" aria-label="Datos principales">
+            <div class="o_bcw_editor_heading">
+                <h5><i class="fa fa-pencil-square-o me-2" aria-hidden="true"/>Datos principales</h5>
+                <p>Revisa el nombre y la unidad de medida. Los campos con * son obligatorios.</p>
+            </div>
             <!-- identificación: solo lectura -->
             <div class="o_bcw_grid o_bcw_grid--2">
                 <div class="o_bcw_field">
@@ -356,20 +365,21 @@
                     <small class="o_bcw_help">La clasificación, la marca de la clave y el consecutivo no se modifican aquí.</small>
                 </div>
                 <div class="o_bcw_field">
-                    <label class="o_bcw_label">Nombre actual</label>
+                    <label class="o_bcw_label">Nombre al agregar</label>
                     <div class="o_bcw_readonly" t-esc="state.line.old_name || '—'"/>
-                    <small class="o_bcw_help">Nombre que el producto tiene hoy en el catálogo.</small>
+                    <small class="o_bcw_help">Nombre conservado al agregar el producto a esta sesión.</small>
                 </div>
                 <div class="o_bcw_field">
-                    <label class="o_bcw_label">Nuevo nombre <span class="o_bcw_req">*</span></label>
-                    <input type="text" class="o_bcw_input" t-att-class="{ 'o_bcw_input--error': state.errors.new_name }"
+                    <label class="o_bcw_label" for="bcw_editor_name">Nuevo nombre <span class="o_bcw_req">*</span></label>
+                    <input type="text" id="bcw_editor_name" t-ref="editorName" class="o_input o_bcw_input" required="required"
+                           t-att-aria-invalid="!!state.errors.new_name" t-att-class="{ 'o_bcw_input--error': state.errors.new_name }"
                            t-att-value="state.draft.new_name" t-att-readonly="props.readonly"
                            t-on-input="(ev) => this.onInput('new_name', ev)"/>
                     <small t-if="state.errors.new_name" class="o_bcw_error" t-esc="state.errors.new_name"/>
                 </div>
                 <div class="o_bcw_field">
-                    <label class="o_bcw_label">Unidad de medida <span class="o_bcw_req">*</span></label>
-                    <select class="o_bcw_input" t-att-class="{ 'o_bcw_input--error': state.errors.uom_id }"
+                    <label class="o_bcw_label" for="bcw_editor_uom">Unidad de medida <span class="o_bcw_req">*</span></label>
+                    <select id="bcw_editor_uom" class="o_input o_bcw_input" required="required" t-att-aria-invalid="!!state.errors.uom_id" t-att-class="{ 'o_bcw_input--error': state.errors.uom_id }"
                             t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('uom_id', ev)">
                         <option value="" t-att-selected="!state.draft.uom_id">—</option>
                         <option t-foreach="state.catalogs.uoms" t-as="uom" t-key="uom.id" t-att-value="uom.id"
@@ -378,8 +388,19 @@
                     <small t-if="state.errors.uom_id" class="o_bcw_error" t-esc="state.errors.uom_id"/>
                 </div>
             </div>
+            </section>
 
-            <div class="o_bcw_modal_sep"><span>Información adicional</span></div>
+            <section class="o_bcw_editor_card" aria-label="Información adicional">
+            <button type="button" class="o_bcw_details_toggle" t-att-aria-expanded="state.detailsOpen"
+                    aria-controls="bcw_editor_details" t-on-click="toggleDetails">
+                <i class="fa fa-sliders" aria-hidden="true"/>
+                <div class="o_bcw_editor_heading">
+                    <h5>Información adicional</h5>
+                    <p>Opcional: presentación, referencias, fabricante y uso del producto.</p>
+                </div>
+                <i t-att-class="state.detailsOpen ? 'fa fa-chevron-up' : 'fa fa-chevron-down'" aria-hidden="true"/>
+            </button>
+            <div id="bcw_editor_details" class="o_bcw_details_body" t-if="state.detailsOpen">
 
             <div class="o_bcw_grid o_bcw_grid--2">
                 <div class="o_bcw_field">
@@ -518,6 +539,8 @@
                           t-att-readonly="props.readonly" t-on-input="(ev) => this.onInput('notes', ev)"
                           t-esc="state.draft.notes"/>
             </div>
+            </div>
+            </section>
 
             <div t-if="state.confirmClose" class="o_bcw_confirm">
                 <div class="o_bcw_confirm_box">
