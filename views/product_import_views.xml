@@ -18,7 +18,7 @@
                     <button name="action_validate_import" type="object" string="Confirmar revisión de origen" class="btn-primary"
                             confirm="¿Validó identidad, presentación, moneda y precios de esta ficha? Las filas de origen se conservarán."
                             groups="biotex_base.group_biotex_direction" invisible="biotex_import_status == 'validated'"/>
-                    <field name="biotex_import_source" nolabel="1"/>
+                    <field name="biotex_import_detail" nolabel="1" readonly="1"/>
                 </page>
             </xpath>
         </field>
