@@ -6,6 +6,10 @@
         <field name="implied_ids" eval="[(4, ref('biotex_base.group_biotex_delegation'))]"/>
         <field name="comment">Personal capacitado (con examen) que clasifica productos con el asistente.</field>
     </record>
+    <!-- Dirección is the complete business role; selecting it includes classification. -->
+    <record id="biotex_base.group_biotex_direction" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_catalog_classifier'))]"/>
+    </record>
     <record id="base.user_admin" model="res.users">
         <field name="group_ids" eval="[(4, ref('biotex_base.group_biotex_direction')), (4, ref('group_catalog_classifier'))]"/>
     </record>
