@@ -35,10 +35,11 @@ class ProductTemplate(models.Model):
                     cells.append(Markup('<tr><td>%s</td><th scope="row">%s</th><td>%s</td><td>%s</td></tr>') % (
                         index + 1, escape(label or 'Sin encabezado'),
                         escape(str(value) if value is not None else '—'), escape(formula)))
-                sections.append(Markup('<h4>Hoja 20_REMAPEO · Fila %s</h4>'
+                sections.append(Markup('<h4>Hoja %s · Fila %s</h4>'
                     '<div class="table-responsive"><table class="table table-sm table-striped">'
                     '<thead><tr><th>Columna</th><th>Campo del Excel</th><th>Valor de origen</th>'
                     '<th>Fórmula de origen</th></tr></thead><tbody>%s</tbody></table></div>') % (
+                        escape(str(row.get('worksheet') or source.get('worksheet') or '20_REMAPEO')),
                         escape(str(row.get('worksheet_row', ''))), Markup('').join(cells)))
             attachment = source.get('source_attachment_id')
             if isinstance(attachment, int) and attachment > 0:
