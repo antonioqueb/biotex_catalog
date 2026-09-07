@@ -154,7 +154,9 @@ def import_products(env, filename, *, apply=False):
             'name': useful(value(row, 6)) or useful(value(row, 23)),
             'biotex_name': useful(value(row, 6)), 'default_code': code,
             'type': 'consu', 'is_storable': True, 'company_id': False,
-            'categ_id': family.id or env.ref('product.product_category_all').id,
+            # Odoo 19 permits an empty category; an absent/unknown family must
+            # stay empty rather than being assigned a made-up classification.
+            'categ_id': family.id,
             'biotex_classifier_id': classifier.id,
             'biotex_brand_id': brand(brand_code, value(row, 11), notes),
             'biotex_consecutive': int(consecutive) if consecutive.isdigit() else 0,
