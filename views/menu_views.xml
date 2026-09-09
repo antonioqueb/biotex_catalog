@@ -27,4 +27,7 @@
     <!-- Acceso también desde Inventario -->
     <menuitem id="menu_stock_catalog" name="Catálogo" parent="stock.menu_stock_inventory_control" sequence="1" action="action_biotex_products"/>
     <menuitem id="menu_stock_pending" name="Pendientes de clasificar" parent="stock.menu_stock_inventory_control" sequence="2" action="action_biotex_products_pending"/>
+    <menuitem id="menu_stock_classification_workspace" name="Clasificador de catálogo"
+              parent="stock.menu_stock_inventory_control" sequence="3"
+              action="action_biotex_classification_workspace" groups="biotex_catalog.group_catalog_classifier"/>
 </odoo>
