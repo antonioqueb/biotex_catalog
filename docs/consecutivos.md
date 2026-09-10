@@ -2,7 +2,7 @@
 
 Versión `19.0.2.3.0`.
 
-La numeración se comparte por prefijo `GG-MMMM-FFF-CCC` entre empresas, productos activos y archivados, asistente individual, sesiones de clasificación y reordenamiento por medida. Por ejemplo, después de `CE-LGMD-EDO-EKG-17` se reserva `CE-LGMD-EDO-EKG-18`. Otro prefijo tiene su propia numeración.
+La numeración se comparte por prefijo `GG-FFF-CCC-MMMM` (y `GG-MMMM-FFF-CCC` para las claves anteriores) entre empresas, productos activos y archivados, asistente individual, sesiones de clasificación y reordenamiento por medida. Por ejemplo, después de `CE-LGMD-EDO-EKG-17` se reserva `CE-LGMD-EDO-EKG-18`. Otro prefijo tiene su propia numeración.
 
 El contador persistente conserva el mayor número usado o reservado. Al obtener el siguiente también se consulta el sufijo numérico de las claves reales, el contador almacenado y los antecedentes de las sesiones. Una clave importada con contador vacío sigue contando. La migración inicializa los contadores con los datos existentes sin renumerar productos ni borradores.
 

@@ -24,7 +24,7 @@ const EMPTY = () => ({
 });
 
 /**
- * Asistente de clasificación v2. Sigue el orden de la clave GG-MMMM-FFF-CCC-NN:
+ * Asistente de clasificación v2. La clave es GG-FFF-CCC-MMMM-NN; la captura sigue el orden jerárquico:
  * grupo (eje) → familia → clasificador autorizado → marca (código) → descripción → uso y origen → fotos → revisión.
  */
 export class BiotexClassifier extends Component {

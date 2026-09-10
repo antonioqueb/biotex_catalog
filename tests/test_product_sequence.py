@@ -19,7 +19,7 @@ class TestProductSequence(TransactionCase):
             'biotex_classifier_ids': [(6, 0, cls.classifier.ids)],
         })
         cls.brand = cls.env['biotex.brand'].create({'name': 'Sequence test brand', 'code': 'CNSQ'})
-        cls.prefix = '%s-CNSQ-TSQ-%s' % (cls.family.biotex_group_id.code, cls.classifier.code)
+        cls.prefix = '%s-TSQ-%s-CNSQ' % (cls.family.biotex_group_id.code, cls.classifier.code)  # GG-FFF-CCC-MMMM
         cls.counter = cls.env['biotex.product.sequence']
         cls.operator = new_test_user(cls.env(context={**cls.env.context, 'no_reset_password': True}),
                                     login='product_sequence_test_operator', groups='biotex_catalog.group_catalog_classifier')
@@ -154,14 +154,20 @@ class TestProductSequence(TransactionCase):
         b = self.product(name='B sequence fixture', default_code=self.prefix + '-02')
         self.product(default_code=self.prefix + '-09', active=False)
         session = self.session()
-        # A draft reservation remains reserved while the family is reordered.
+        # `a` ya tiene clave de esta clasificación: entra conservando su referencia, sin reservar número.
         session.workspace_add_products(a.ids)
-        wizard = self.env['biotex.reorder.wizard'].with_user(self.env.ref('base.user_admin')).create({'family_id': self.family.id})
+        self.assertTrue(session.line_ids.preserve_reference)
+        self.assertEqual(session.line_ids.consecutive, 0)
+        # Una reserva de un producto nuevo sí sigue bloqueada mientras la familia se reordena.
+        session.workspace_add_products(self.product().ids)
+        self.assertEqual(session.line_ids.mapped('consecutive'), [0, 10])
+        wizard = self.env['biotex.reorder.wizard'].with_user(self.env.ref('base.user_admin')).create({'product_ids': [(6, 0, (a | b).ids)]})
         self.assertIn(self.prefix + '-11', str(wizard.preview))
         wizard.action_apply()
         self.assertEqual(a.default_code, self.prefix + '-11')
         self.assertEqual(b.default_code, self.prefix + '-12')
-        self.assertEqual(session.line_ids.consecutive, 10)
+        # La línea conservada sigue a la clave actual del producto.
+        self.assertEqual(session.line_ids.filtered('preserve_reference').reference, self.prefix + '-11')
 
     def test_counter_is_shared_across_companies(self):
         other_company = self.env['res.company'].search([('id', '!=', self.env.company.id)], limit=1)

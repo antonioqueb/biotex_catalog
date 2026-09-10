@@ -8,6 +8,7 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 import { BiotexLineEditorDialog } from "./line_editor";
 import { BiotexClassificationReviewDialog } from "./review_dialog";
 import { BiotexImageGalleryDialog } from "./image_gallery_dialog";
+import { CODE_ORDER } from "./reference";
 
 const MODEL = "biotex.classification.session";
 const PAGE_SIZE = 20;
@@ -23,9 +24,6 @@ const LEVELS = [
     { key: "classifier", label: "Clasificador", icon: "fa-crosshairs", tone: "classifier" },
     { key: "brand", label: "Marca", icon: "fa-bookmark-o", tone: "brand" },
 ];
-
-/** La clave v2 es GG-MMMM-FFF-CCC-NN: la marca va en el segundo segmento, no al final. */
-const CODE_ORDER = ["group", "brand", "family", "classifier"];
 
 export class BiotexClassificationWorkspace extends Component {
     static template = "biotex_catalog.ClassificationWorkspace";
@@ -81,11 +79,14 @@ export class BiotexClassificationWorkspace extends Component {
         const data = await this.orm.call(MODEL, "workspace_bootstrap", [sessionId]);
         Object.assign(this.state, { tree: data.tree, brands: data.brands, uoms: data.uoms, drafts: data.drafts, loading: false });
         this.applySession(data.session);
+        if (data.notice) this.notification.add(data.notice, { type: "warning", sticky: true });
         if (this.state.session) {
-            this.state.stage = this.lines.length ? 3 : 2;
-            this.state.collapsed[1] = true;
+            // Una sesión creada desde la lista de productos puede traer productos sin clasificación todavía:
+            // se empieza por la etapa 1 para fijarla y así reservar los consecutivos.
+            this.state.stage = !this.classificationComplete ? 1 : this.lines.length ? 3 : 2;
+            this.state.collapsed[1] = this.classificationComplete;
             this.state.collapsed[2] = this.state.stage === 3;
-            await this.runSearch(0);
+            if (this.classificationComplete) await this.runSearch(0);
         }
     }
 
@@ -207,6 +208,7 @@ export class BiotexClassificationWorkspace extends Component {
                 if (this.pendingProductIds.length) {
                     const populated = await this.orm.call(MODEL, "workspace_add_products", [[data.id], this.pendingProductIds]);
                     this.applySession(populated);
+                    this.notifySkipped(populated);
                     this.pendingProductIds = [];
                     this.goStage(3);
                 }
@@ -222,7 +224,7 @@ export class BiotexClassificationWorkspace extends Component {
         }
     }
 
-    /** Segmentos coloreados de la clave, en el orden real GG-MMMM-FFF-CCC. */
+    /** Segmentos coloreados de la clave, en el orden real GG-FFF-CCC-MMMM. */
     get codeSegments() {
         return CODE_ORDER.map((key) => {
             const sel = this.selection(key);
@@ -348,6 +350,7 @@ export class BiotexClassificationWorkspace extends Component {
         try {
             const data = await this.orm.call(MODEL, "workspace_add_products", [[this.state.session.id]], { product_ids: [record.id] });
             this.applySession(data);
+            this.notifySkipped(data);
             this.state.search.records = this.state.search.records.filter((r) => r.id !== record.id);
             this.state.search.selectedId = null;
             if (clearQuery && this.state.search.query === query) this.state.search.query = "";
@@ -404,8 +407,18 @@ export class BiotexClassificationWorkspace extends Component {
     }
 
     onNameChange(line, ev) {
+        if (line.preserve_reference) return; // el producto ya tiene clave: su nombre se conserva
         line.new_name = ev.target.value;
         this.saveLine(line, { new_name: line.new_name });
+    }
+
+    /** Productos que el servidor no agregó porque están en otra clasificación en curso. */
+    notifySkipped(data) {
+        if (data?.skipped?.length) {
+            this.notification.add(
+                _t("No se agregaron %s producto(s) porque están en otra clasificación en curso: %s", data.skipped.length, data.skipped.join("; ")),
+                { type: "warning", sticky: true });
+        }
     }
 
     onUomChange(line, ev) {

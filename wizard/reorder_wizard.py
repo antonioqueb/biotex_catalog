@@ -13,7 +13,7 @@ class BiotexReorderWizard(models.TransientModel):
 
     family_id = fields.Many2one('product.category', domain=[('biotex_level', '=', 'family')])
     product_ids = fields.Many2many('product.template', string='Productos seleccionados')
-    historical_prefix = fields.Char(string='Clasificación actual o anterior',help='Ejemplo: CE-LGMD-EDO-EKG. Incluye productos que antes tuvieron ese prefijo.')
+    historical_prefix = fields.Char(string='Clasificación actual o anterior',help='Ejemplo: CE-EDO-EKG-LGMD (o CE-LGMD-EDO-EKG en el orden anterior). Incluye productos que antes tuvieron ese prefijo.')
     component = fields.Char(string='Ordenar por componente',help='Ejemplo: AGUJA o CABLE. Vacío utiliza la primera medida.')
     measure_type = fields.Char(string='Tipo de medida',help='Ejemplo: LARGO o CALIBRE.')
     preview = fields.Html(compute='_compute_preview')

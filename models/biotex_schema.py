@@ -1,6 +1,6 @@
 """Esquema de clasificación v2: División > Grupo > Familia > Clasificador, con Marca como atributo.
 
-Clave comercial  GG-MMMM-FFF-CCC-NN   (ej. CE-LGMD-EDO-EKG-01)
+Clave comercial  GG-FFF-CCC-MMMM-NN   (ej. CE-EDO-EKG-LGMD-01; antes GG-MMMM-FFF-CCC-NN)
 Clave de genérico G-GG-FFF-CCC-NNN    (ej. G-CE-EDO-EKG-001)
 
 El grupo no es un nivel de categoría: se muestra como etiqueta del producto (product.tag sincronizada)

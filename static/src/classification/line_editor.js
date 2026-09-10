@@ -3,9 +3,7 @@ import { Component, useState, useRef, onWillStart, onMounted } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
-
-/** Tono de cada segmento de la referencia GG-MMMM-FFF-CCC-NN, igual que en la página 1 del asistente. */
-const REFERENCE_TONES = ["group", "brand", "family", "classifier"];
+import { referenceTones } from "./reference";
 
 class BiotexEditorDialog extends Dialog {
     static props = { ...Dialog.props, requestClose: Function };
@@ -176,14 +174,14 @@ export class BiotexLineEditorDialog extends Component {
     get productTitle() {
         return this.state.line.old_name || this.state.line.new_name || "";
     }
-    /**
-     * Referencia final con los mismos tonos que la página 1: grupo, marca, familia, clasificador
-     * (formato GG-MMMM-FFF-CCC) y el consecutivo al final.
-     */
+    /** Referencia final con los mismos tonos que la página 1 (grupo, familia, clasificador, marca, consecutivo). */
     get referenceSegments() {
         const code = this.state.line.reference || this.props.classCode || "";
-        if (!code) return [];
-        return code.split("-").map((text, i) => ({ text, tone: REFERENCE_TONES[i] || "consecutive" }));
+        return code ? referenceTones(code) : [];
+    }
+    /** Producto ya clasificado con esta misma clave: el nombre y la referencia no se tocan. */
+    get nameLocked() {
+        return !!this.state.line.preserve_reference;
     }
     /** Descripción armada con medidas y complemento; se ofrece como sugerencia, no sustituye lo escrito. */
     get suggestedName() {
@@ -195,6 +193,7 @@ export class BiotexLineEditorDialog extends Component {
         return [d.base_name || d.new_name, measures, d.description_extra].filter(Boolean).join(" ").toUpperCase();
     }
     get showSuggestion() {
+        if (this.nameLocked) return false;
         const suggested = this.suggestedName;
         return !!suggested && suggested !== (this.state.draft.new_name || "").toUpperCase();
     }

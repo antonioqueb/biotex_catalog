@@ -7,24 +7,36 @@ salir" y retomarla más tarde.
 
 Reglas de la iteración 1:
 
-* El consecutivo se **reserva al agregar** el producto y ya no cambia al reordenar la lista: el
-  orden es prioridad de trabajo, la numeración es identidad. Solo se reasigna si cambia la
-  clasificación de la sesión (cambia el prefijo, luego la referencia entera deja de valer).
+* El consecutivo se **reserva al agregar** el producto (o al fijar la clasificación, si la sesión
+  se creó vacía desde la lista de productos) y ya no cambia al reordenar la lista: el orden es
+  prioridad de trabajo, la numeración es identidad. Solo se reasigna si cambia la clasificación
+  de la sesión (cambia el prefijo, luego la referencia entera deja de valer).
 * La referencia solo se escribe en `default_code` **al confirmar** la sesión. El número queda
   reservado desde el agregado, incluso si después se cancela o elimina el borrador.
-* El formato de clave es el del esquema v2 vigente, `GG-MMMM-FFF-CCC-NN`
-  (grupo · marca · familia · clasificador · consecutivo), el mismo que produce
-  `product.template.action_assign_clave`.
+* **Reclasificación**: un producto que ya tiene clave completa de la misma clasificación entra con
+  `preserve_reference`: no reserva consecutivo, conserva su referencia y su nombre, y solo se
+  editan los demás datos. Si la clasificación es otra, se genera clave nueva con revisión previa.
+* Un producto solo puede estar en **una** sesión en borrador a la vez; la lista de productos lo
+  muestra "En clasificación" hasta que la sesión se confirma o se cancela.
+* El formato de clave es `GG-FFF-CCC-MMMM-NN` (grupo · familia · clasificador · marca ·
+  consecutivo), el mismo que produce `product.template.action_assign_clave`. Las claves
+  generadas con el orden anterior se conservan tal cual (ver docs/reordenamiento-folio.md).
 """
 import hashlib
 import json
+from urllib.parse import quote as url_quote
 
 from markupsafe import Markup
 from odoo import api, fields, models
 from odoo.tools import SQL
 from odoo.exceptions import UserError, ValidationError
+from odoo.http import request
 from .product_details import clean_measures, upper
 from odoo.fields import Domain
+
+# Clave en la sesión HTTP con la sesión de clasificación que la lista de productos acaba de abrir en
+# una pestaña nueva (ver controllers/main.py). El asistente la consume en el primer bootstrap.
+HTTP_SESSION_KEY = 'biotex_classification_open'
 
 CONSECUTIVE_FORMAT = '%02d'
 
@@ -61,9 +73,9 @@ class BiotexClassificationSession(models.Model):
     @api.depends('group_id.code', 'brand_id.code', 'family_id.biotex_code', 'classifier_id.code')
     def _compute_class_code(self):
         for session in self:
-            parts = (session.group_id.code, session.brand_id.code, session.family_id.biotex_code, session.classifier_id.code)
+            parts = (session.group_id.code, session.family_id.biotex_code, session.classifier_id.code, session.brand_id.code)
             session.complete = all(parts)
-            session.class_code = '-'.join(parts) if session.complete else False
+            session.class_code = self.env['biotex.product.sequence']._prefix_for(*parts) if session.complete else False
 
     @api.depends('class_code', 'date')
     def _compute_name(self):
@@ -111,12 +123,18 @@ class BiotexClassificationSession(models.Model):
         return self.env['biotex.product.sequence']._next(self.class_code, reserve=True)
 
     def _reassign_consecutives(self):
-        """Renumera la sesión completa: solo tras cambiar la clasificación, porque cambia el prefijo."""
+        """Renumera la sesión completa: solo tras cambiar la clasificación, porque cambia el prefijo.
+
+        Las líneas cuyo producto ya tiene clave de esta misma clasificación conservan su referencia
+        y no consumen consecutivo.
+        """
         self.ensure_one()
         lines = self.line_ids.sorted(lambda l: (l.sequence, l.id))
         super(BiotexClassificationSessionLine, lines).write({'consecutive': 0})
         for line in lines:
-            line._reserve_consecutive()
+            line._refresh_identity()
+            if not line.preserve_reference:
+                line._reserve_consecutive()
 
     def _ensure_reservations(self):
         """Repair colliding legacy drafts before building the confirmation revision."""
@@ -126,6 +144,9 @@ class BiotexClassificationSession(models.Model):
         Line = self.env['biotex.classification.session.line'].sudo()
         Product = self.env['product.product'].sudo().with_context(active_test=False)
         for line in self.line_ids.sorted('id'):
+            line._refresh_identity()
+            if line.preserve_reference:
+                continue  # conserva la clave que ya tiene el producto
             collision = not line.consecutive or Line.search_count([
                 ('session_id.class_code', '=', self.class_code), ('consecutive', '=', line.consecutive),
                 ('id', '!=', line.id),
@@ -190,7 +211,7 @@ class BiotexClassificationSession(models.Model):
                 if session.class_code:
                     session._reassign_consecutives()
                 else:
-                    super(BiotexClassificationSessionLine, session.line_ids).write({'consecutive': 0})
+                    super(BiotexClassificationSessionLine, session.line_ids).write({'consecutive': 0, 'preserve_reference': False})
         return result
 
     def unlink(self):
@@ -219,8 +240,20 @@ class BiotexClassificationSession(models.Model):
     @api.model
     def workspace_bootstrap(self, session_id=None):
         """Todo lo que la pantalla necesita en una sola llamada: árbol, marcas, unidades y sesión."""
+        notice = ''
+        if not session_id and request:
+            # Abierto en pestaña nueva desde la lista de productos: la sesión y los avisos vienen
+            # de la sesión HTTP, no de la URL, y se consumen una sola vez.
+            pending = request.session.get(HTTP_SESSION_KEY) or {}
+            if pending:
+                request.session[HTTP_SESSION_KEY] = None
+            session_id = pending.get('session_id')
+            notice = pending.get('notice') or ''
         session = self.browse(session_id).exists() if session_id else self.browse()
+        if session and session.state != 'draft':
+            session = self.browse()
         return {
+            'notice': notice,
             'tree': self.env['product.category'].biotex_get_tree(),
             'brands': self.env['biotex.brand'].search_read([], ['id', 'name', 'code'], order='name'),
             'uoms': self.env['uom.uom'].search_read([], ['id', 'name'], order='sequence, id'),
@@ -287,6 +320,8 @@ class BiotexClassificationSession(models.Model):
                 'default_code': p.default_code or '',
                 'reference': p.biotex_reference or p.barcode or '',
                 'brand': p.biotex_brand_id.name or '',
+                # en otra sesión en borrador: se muestra "En clasificación" y no se puede agregar
+                'locked_by': p.biotex_classification_session_id.name if p.biotex_classification_session_id and p.biotex_classification_session_id != self else '',
             } for p in products],
         }
 
@@ -299,7 +334,12 @@ class BiotexClassificationSession(models.Model):
         Line = self.env['biotex.classification.session.line']
         products = self.env['product.template'].browse(list(dict.fromkeys(pid for pid in product_ids if pid not in existing))).exists()
         products.check_access('read')
+        skipped = []
         for product in products:
+            other = product.biotex_classification_session_id
+            if other and other != self:
+                skipped.append('%s (%s)' % (product.display_name, other.name))
+                continue
             sequence += 10
             Line.create({
                 'session_id': self.id,
@@ -333,7 +373,28 @@ class BiotexClassificationSession(models.Model):
                 'measure_data': product.biotex_measure_ids._data(),
                 'presentation_data': product._biotex_presentation_data(),
             })
-        return self._workspace_session()
+        result = self._workspace_session()
+        if skipped:
+            result['skipped'] = skipped
+        return result
+
+    @api.model
+    def workspace_open_from_products(self, products):
+        """Acción "Clasificar con asistente" de la lista: agrega a la última sesión activa del usuario
+        (o crea una vacía) y devuelve la URL para abrir el asistente en una pestaña nueva."""
+        products = products.exists()
+        session = self.search([('state', '=', 'draft'), ('user_id', '=', self.env.uid)], order='write_date desc, id desc', limit=1)
+        if not session:
+            session = self.create({})
+        data = session.workspace_add_products(products.ids)
+        skipped = data.get('skipped') or []
+        if skipped and len(skipped) == len(products):
+            raise UserError('Los productos seleccionados ya están en otra clasificación en curso:\n- ' + '\n- '.join(skipped))
+        notice = ''
+        if skipped:
+            notice = 'No se agregaron %d producto(s) porque ya están en otra clasificación en curso: %s' % (len(skipped), '; '.join(skipped))
+        return {'type': 'ir.actions.act_url', 'target': 'new',
+                'url': '/biotex_catalog/classification/open/%d?notice=%s' % (session.id, url_quote(notice))}
 
     def workspace_remove_line(self, line_id):
         self.ensure_one()
@@ -369,6 +430,8 @@ class BiotexClassificationSession(models.Model):
             return clean[field] if field in clean else current
         if not (effective('new_name', line.new_name) or '').strip():
             raise UserError('El nuevo nombre es obligatorio.')
+        if line.preserve_reference and 'new_name' in clean and upper(clean['new_name'] or '') != upper(line.new_name or ''):
+            raise UserError('"%s" ya tiene clave %s: su nombre y su referencia se conservan. Edite los demás datos.' % (line.product_id.display_name, line.reference))
         if not effective('uom_id', line.uom_id.id):
             raise UserError('La unidad de medida es obligatoria.')
         qty = effective('package_qty', line.package_qty)
@@ -506,6 +569,9 @@ class BiotexClassificationSessionLine(models.Model):
     consecutive = fields.Integer(string='Consecutivo', readonly=True, copy=False,
                                 help='Se reserva al agregar el producto y no cambia al reordenar la lista.')
     reference = fields.Char(string='Referencia generada', compute='_compute_reference', store=True)
+    preserve_reference = fields.Boolean(
+        string='Conserva clave y nombre', readonly=True, copy=False,
+        help='El producto ya tenía clave completa de esta misma clasificación: se reclasifican sus datos sin regenerar la referencia ni cambiar el nombre.')
     state = fields.Selection([('draft', 'Pendiente'), ('applied', 'Aplicada')], default='draft', required=True)
 
     # --- información adicional: se captura en la sesión y se escribe en el producto al confirmar ---
@@ -551,17 +617,27 @@ class BiotexClassificationSessionLine(models.Model):
             session._check_editable()
         if any(set(vals) & set(self.AUDIT_FIELDS) or vals.get('state', 'draft') != 'draft' for vals in vals_list):
             raise UserError('El historial de aplicación se registra al confirmar.')
-        prepared = []
+        Product = self.env['product.template']
         for vals in vals_list:
-            session = sessions.browse(vals['session_id'])
-            prepared.append(dict(vals, consecutive=session._next_consecutive()))
-        return super().create([{**v, **{k: upper(v[k]) for k in self._upper_fields() if k in v}} for v in prepared])
+            other = Product.browse(vals['product_id']).biotex_classification_session_id
+            if other and other.id != vals['session_id']:
+                raise UserError('"%s" ya está en la clasificación en curso %s. Termínela o cancélela antes de agregarlo a otra.' % (
+                    Product.browse(vals['product_id']).display_name, other.name))
+        lines = super().create([{**v, 'consecutive': 0, **{k: upper(v[k]) for k in self._upper_fields() if k in v}} for v in vals_list])
+        for line in lines:
+            # Sin clasificación todavía (sesión creada desde la lista de productos) no hay nada que
+            # reservar: el consecutivo se asigna al fijar la clasificación.
+            if line.session_id.class_code:
+                line._refresh_identity()
+                if not line.preserve_reference:
+                    line._reserve_consecutive()
+        return lines
 
     def write(self, vals):
         self.session_id._lock_workspace()
         if any(line.state == 'applied' or line.session_id.state != 'draft' for line in self):
             raise UserError('Conserve la línea aplicada en su sesión original.')
-        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name', 'consecutive', 'reference'}):
+        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name', 'consecutive', 'reference', 'preserve_reference'}):
             raise UserError('La identidad y el historial de la línea no se modifican manualmente.')
         if 'brand_id' in vals:
             raise UserError('La marca se toma de la clasificación principal.')
@@ -592,11 +668,30 @@ class BiotexClassificationSessionLine(models.Model):
         'El producto ya está en esta sesión de clasificación.',
     )
 
-    @api.depends('session_id.class_code', 'consecutive')
+    @api.depends('session_id.class_code', 'consecutive', 'preserve_reference', 'product_id.default_code')
     def _compute_reference(self):
         for line in self:
+            if line.preserve_reference:
+                line.reference = line.product_id.default_code or False
+                continue
             code = line.session_id.class_code
             line.reference = ('%s-' + CONSECUTIVE_FORMAT) % (code, line.consecutive) if code and line.consecutive else False
+
+    def _matches_session_identity(self):
+        """True si el producto ya tiene clave válida y su clasificación es la misma que la de la sesión."""
+        self.ensure_one()
+        product, session = self.product_id, self.session_id
+        if not session.complete or not self.env['biotex.product.sequence']._split_code(product.default_code):
+            return False
+        return (product.categ_id == session.family_id and product.biotex_classifier_id == session.classifier_id
+                and product.biotex_brand_id == session.brand_id)
+
+    def _refresh_identity(self):
+        """Recalcula si la línea conserva la identidad del producto (reclasificación de datos)."""
+        for line in self:
+            preserve = line._matches_session_identity()
+            if preserve != line.preserve_reference:
+                super(BiotexClassificationSessionLine, line).write({'preserve_reference': preserve, 'consecutive': 0 if preserve else line.consecutive})
 
     @api.depends('product_id.name', 'new_name')
     def _compute_display_name(self):
@@ -617,6 +712,7 @@ class BiotexClassificationSessionLine(models.Model):
             'consecutive': self.consecutive,
             'consecutive_label': CONSECUTIVE_FORMAT % self.consecutive if self.consecutive else '',
             'reference': self.reference or '',
+            'preserve_reference': self.preserve_reference,
             'state': self.state,
             'brand_name': self.session_id.brand_id.display_name or '',
             'measure': self.measure or '',
@@ -664,11 +760,11 @@ class BiotexClassificationSessionLine(models.Model):
             'categ_id': session.family_id.id,
             'biotex_classifier_id': session.classifier_id.id,
             'biotex_brand_id': session.brand_id.id,
-            'default_code': self.reference,
-            'biotex_consecutive': self.consecutive,
         }
-        if self.new_name and self.new_name != product.name:
-            vals['name'] = self.new_name
+        if not self.preserve_reference:
+            vals.update({'default_code': self.reference, 'biotex_consecutive': self.consecutive})
+            if self.new_name and self.new_name != product.name:
+                vals['name'] = self.new_name
         if self.uom_id and self.uom_id != product.uom_id:
             vals['uom_id'] = self.uom_id.id
         detail = {

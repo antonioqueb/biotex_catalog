@@ -44,7 +44,7 @@ La clasificación reutiliza los modelos que ya existen —`biotex.group`, `produ
 - Al confirmar (**Generar claves**) se escribe en cada producto: familia, clasificador, marca,
   nombre, unidad de medida, `default_code`, `biotex_consecutive` y —solo si el producto no tenía
   código de barras ni referencia de fabricante— el `barcode`.
-- El formato de clave es el del esquema v2 vigente, `GG-MMMM-FFF-CCC-NN`
+- El formato de clave es `GG-FFF-CCC-MMMM-NN` (grupo · familia · clasificador · marca · consecutivo); las claves anteriores `GG-MMMM-FFF-CCC-NN` se reconocen y conservan (ver docs/reordenamiento-folio.md)
   (grupo · marca · familia · clasificador · consecutivo), el mismo que produce
   `product.template.action_assign_clave`. Ej. `MC-3M3M-PUN-AGU-01`.
 - Fuera de alcance en esta iteración: fotografías, validación final, clasificación por IA y la

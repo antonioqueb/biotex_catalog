@@ -188,14 +188,18 @@
                                 <tbody>
                                     <tr t-foreach="state.search.records" t-as="record" t-key="record.id" t-att-data-product-id="record.id"
                                         t-att-class="{o_bcw_row_selected: state.search.selectedId === record.id}">
-                                        <td class="o_bcw_cell_name"><t t-esc="record.name"/></td>
+                                        <td class="o_bcw_cell_name">
+                                            <t t-esc="record.name"/>
+                                            <span t-if="record.locked_by" class="o_bcw_badge o_bcw_badge_warn" t-att-title="'En clasificación en curso: ' + record.locked_by">En clasificación</span>
+                                        </td>
                                         <td class="o_bcw_mono"><t t-esc="record.default_code or record.reference or '—'"/></td>
                                         <td><t t-esc="record.brand or '—'"/></td>
                                         <td class="o_bcw_w_act">
-                                            <button class="o_bcw_add" t-on-click="() => this.addProduct(record)"
+                                            <button t-if="!record.locked_by" class="o_bcw_add" t-on-click="() => this.addProduct(record)"
                                                     t-att-disabled="confirmed or state.busy or state.search.loading" t-att-aria-label="'Agregar ' + record.name" title="Agregar a la clasificación">
                                                 <i class="fa fa-plus"/> Agregar
                                             </button>
+                                            <span t-else="" class="o_bcw_hint" t-att-title="record.locked_by">En otra sesión</span>
                                         </td>
                                     </tr>
                                     <tr t-if="!state.search.records.length">
@@ -286,7 +290,8 @@
                                         <td class="o_bcw_w_num o_bcw_mono"><t t-esc="line_index + 1"/></td>
                                         <td>
                                             <input type="text" class="o_bcw_input o_bcw_cell_input"
-                                                   t-att-value="line.new_name" t-att-readonly="confirmed" t-att-aria-label="'Nombre de ' + line.old_name"
+                                                   t-att-value="line.new_name" t-att-readonly="confirmed or line.preserve_reference" t-att-aria-label="'Nombre de ' + line.old_name"
+                                                   t-att-title="line.preserve_reference ? 'Producto ya clasificado: el nombre y la referencia se conservan' : ''"
                                                    t-on-input="(ev) => this.onLineInput(line, 'new_name', ev)"
                                                    t-on-change="(ev) => this.onNameChange(line, ev)"/>
                                         </td>
@@ -299,8 +304,11 @@
                                                         t-att-value="uom.id" t-att-selected="uom.id === line.uom_id" t-esc="uom.name"/>
                                             </select>
                                         </td>
-                                        <td class="o_bcw_mono o_bcw_ref"><t t-esc="line.reference or '—'"/></td>
-                                        <td class="o_bcw_mono"><t t-esc="line.consecutive_label or '—'"/></td>
+                                        <td class="o_bcw_mono o_bcw_ref">
+                                            <t t-esc="line.reference or '—'"/>
+                                            <i t-if="line.preserve_reference" class="fa fa-lock o_bcw_lock" aria-hidden="true" title="Clave conservada: el producto ya estaba clasificado"/>
+                                        </td>
+                                        <td class="o_bcw_mono"><t t-esc="line.preserve_reference ? '—' : (line.consecutive_label or '—')"/></td>
                                         <td class="o_bcw_w_img">
                                             <button t-if="imageCount(line)" type="button" class="o_bcw_img_btn o_bcw_img_has"
                                                     t-att-title="imageTitle(line)" t-att-aria-label="imageTitle(line) + ' de ' + (line.new_name || line.old_name)"
@@ -324,7 +332,9 @@
                         <p class="o_bcw_hint">
                             Puedes cambiar el orden de los productos arrastrando el icono de 6 puntos.
                             El consecutivo no cambia al reordenar: se reserva al agregar el producto.
+                            <t t-if="lines.some((l) => l.preserve_reference)"> Los productos con <i class="fa fa-lock" aria-hidden="true"/> ya tenían clave de esta clasificación: conservan referencia y nombre; solo se actualizan sus demás datos.</t>
                         </p>
+                        <p t-if="!classificationComplete" class="o_bcw_warn">Completa la clasificación en la etapa 1 para reservar los consecutivos y poder generar las claves.</p>
                     </t>
                 </div>
             </section>
@@ -381,8 +391,9 @@
                     <label class="o_bcw_label" for="bcw_editor_name">Nuevo Nombre <span class="o_bcw_req">*</span></label>
                     <textarea id="bcw_editor_name" t-ref="editorName" class="o_input o_bcw_input o_bcw_textarea o_bcw_name_input" rows="3" required="required"
                               t-att-aria-invalid="!!state.errors.new_name" t-att-class="{ 'o_bcw_input--error': state.errors.new_name }"
-                              t-att-readonly="props.readonly" placeholder="Nombre con el que quedará el producto en el catálogo"
+                              t-att-readonly="props.readonly or nameLocked" placeholder="Nombre con el que quedará el producto en el catálogo"
                               t-att-value="state.draft.new_name" t-on-input="(ev) => this.onInput('new_name', ev)"/>
+                    <small t-if="nameLocked" class="o_bcw_help"><i class="fa fa-lock me-1" aria-hidden="true"/>Producto ya clasificado con esta clave: el nombre y la referencia se conservan. Puedes editar el resto de los datos.</small>
                     <small t-if="state.errors.new_name" class="o_bcw_error" t-esc="state.errors.new_name"/>
                     <div t-if="showSuggestion and !props.readonly" class="o_bcw_suggestion" role="status">
                         <span class="o_bcw_help">Con medidas y complemento: <strong t-esc="suggestedName"/></span>

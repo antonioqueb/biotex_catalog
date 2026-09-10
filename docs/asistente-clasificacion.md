@@ -31,7 +31,27 @@ No se recibió un archivo identificable del mockup antes/después en el espacio 
 
 Se reutilizan `Dialog`, `o_input`, `o_list_table`, botones y utilidades del backend. Los estilos propios se limitan al asistente y sus diálogos. Las tablas personalizadas no se presentan como un `ListRenderer` nativo porque su edición y fuentes de datos son distintas. Referencias: [Dialog de Odoo 19](https://github.com/odoo/odoo/blob/19.0/addons/web/static/src/core/dialog/dialog.xml) y [temporización de Odoo 19](https://github.com/odoo/odoo/blob/19.0/addons/web/static/src/core/utils/timing.js).
 
+## Apertura desde la lista de productos y bloqueo entre sesiones
+
+**Acciones → Clasificar con asistente** en la lista de productos ya no sustituye la vista: agrega los productos seleccionados a la
+última sesión en borrador del usuario (o crea una vacía) y abre el asistente en una pestaña nueva
+(`/biotex_catalog/classification/open/<sesión>`). La pestaña de productos conserva filtro, búsqueda y selección, y cada nueva
+selección se suma a esa misma sesión hasta que el usuario confirme, cancele o inicie una clasificación nueva. Si el navegador
+bloquea la ventana emergente, el aviso estándar del navegador permite abrirla. Si la sesión se creó vacía, el asistente arranca en la
+etapa 1 y reserva los consecutivos al fijar la clasificación.
+
+Un producto solo puede estar en **una** sesión en borrador a la vez. La lista y la ficha del producto lo muestran con la etiqueta
+**En clasificación** (campo `biotex_classification_status`, filtro homónimo y botón "Ver clasificación en curso"); el paso 2 del
+asistente lo muestra sin botón "Agregar" y la acción de la lista lo omite con un aviso. La marca se libera sola al confirmar o
+cancelar la sesión.
+
 ## Reclasificación e historial
+
+Un producto que **ya tiene clave completa de la misma clasificación** (grupo, familia, clasificador y marca iguales a los de la
+sesión) entra con `preserve_reference`: no reserva consecutivo, conserva su referencia y su nombre (bloqueados en la tabla y en el
+modal, con un candado) y solo se actualizan los demás datos al confirmar. Si la sesión tiene otra clasificación, sigue el flujo de
+abajo y se genera una clave nueva con revisión. Las claves con el orden anterior del folio se conservan tal cual
+(ver `reordenamiento-folio.md`).
 
 **Generar claves** consulta el estado actual del catálogo y abre una revisión. Si cambiará una referencia existente, muestra producto, código anterior y código nuevo; exige marcar la aceptación antes de confirmar.
 

@@ -8,11 +8,14 @@
             <xpath expr="//sheet" position="before">
                 <header>
                     <button name="action_open_classifier" type="object" string="Clasificar con asistente" class="btn-primary"
-                            invisible="biotex_class_state == 'complete'" groups="biotex_catalog.group_catalog_classifier"/>
+                            invisible="biotex_class_state == 'complete' or biotex_classification_status" groups="biotex_catalog.group_catalog_classifier"/>
+                    <button name="action_open_classification_session" type="object" string="Ver clasificación en curso" icon="fa-external-link"
+                            invisible="not biotex_classification_status" groups="biotex_catalog.group_catalog_classifier"/>
                     <button name="action_assign_clave" type="object" string="Asignar clave"
                             invisible="default_code or not biotex_family_id or not biotex_classifier_id or not biotex_brand_id"/>
                     <button name="action_print_qr_label" type="object" string="Etiqueta QR" icon="fa-qrcode" invisible="not default_code"/>
                     <field name="biotex_class_state" widget="biotex_class_badge"/>
+                    <field name="biotex_classification_status" widget="badge" decoration-warning="biotex_classification_status == 'classifying'" invisible="not biotex_classification_status"/>
                 </header>
             </xpath>
             <xpath expr="//field[@name='name']" position="before">
@@ -102,6 +105,8 @@
                 <field name="biotex_reference" optional="show"/>
                 <field name="biotex_generic_id" optional="hide"/>
                 <field name="biotex_class_state" widget="biotex_class_badge" optional="show"/>
+                <field name="biotex_classification_status" widget="badge" decoration-warning="biotex_classification_status == 'classifying'" optional="show"/>
+                <field name="biotex_classification_session_id" optional="hide"/>
                 <field name="biotex_missing" optional="hide"/>
             </field>
         </field>
@@ -126,6 +131,7 @@
                 <filter name="biotex_unclassified" string="Sin clasificar" domain="[('biotex_class_state', '=', 'unclassified')]"/>
                 <filter name="biotex_no_photo" string="Sin foto" domain="[('biotex_class_state', '=', 'no_photo')]"/>
                 <filter name="biotex_complete" string="Completos" domain="[('biotex_class_state', '=', 'complete')]"/>
+                <filter name="biotex_classifying" string="En clasificación" domain="[('biotex_classification_status', '=', 'classifying')]"/>
                 <separator/>
                 <filter name="biotex_regulated" string="Regulados COFEPRIS" domain="[('biotex_regulated', '=', True)]"/>
                 <separator/>

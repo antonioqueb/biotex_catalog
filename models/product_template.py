@@ -8,7 +8,7 @@ from odoo.fields import Domain
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    # --- clasificación (la clave manda: GG-MMMM-FFF-CCC-NN) ---
+    # --- clasificación (la clave manda: GG-FFF-CCC-MMMM-NN) ---
     biotex_family_id = fields.Many2one(
         'product.category', string='Familia', domain=[('biotex_level', '=', 'family')],
         compute='_compute_biotex_family', inverse='_inverse_biotex_family', store=True)
@@ -225,7 +225,7 @@ class ProductTemplate(models.Model):
             raise UserError('"%s" necesita clasificador (%s) antes de asignar clave.' % (self.display_name, fam.biotex_group_id.classifier_axis or 'eje del grupo'))
         if not self.biotex_brand_id or not self.biotex_brand_id.code:
             raise UserError('"%s" necesita marca con código de 4 letras antes de asignar clave.' % self.display_name)
-        return '%s-%s-%s-%s-' % (fam.biotex_group_id.code, self.biotex_brand_id.code, fam.biotex_code, self.biotex_classifier_id.code)
+        return self.env['biotex.product.sequence']._prefix_for(fam.biotex_group_id.code, fam.biotex_code, self.biotex_classifier_id.code, self.biotex_brand_id.code) + '-'
 
     def biotex_preview_clave(self):
         self.ensure_one()
@@ -237,7 +237,7 @@ class ProductTemplate(models.Model):
         return '%s%02d' % (prefix, counter._next(prefix))
 
     def action_assign_clave(self):
-        """Clave GG-MMMM-FFF-CCC-NN, código propio si no hay referencia ni barcode, y genérico."""
+        """Clave GG-FFF-CCC-MMMM-NN, código propio si no hay referencia ni barcode, y genérico."""
         self.check_access('write')
         counter = self.env['biotex.product.sequence']
         for p in self:
@@ -260,9 +260,35 @@ class ProductTemplate(models.Model):
             p.write(vals)
         return True
 
+    # --- sesión de clasificación en curso (asistente masivo) ---
+    biotex_classification_line_ids = fields.One2many('biotex.classification.session.line', 'product_id', string='Líneas de clasificación')
+    biotex_classification_session_id = fields.Many2one(
+        'biotex.classification.session', string='Clasificación en curso', compute='_compute_classification_session', store=True, compute_sudo=True,
+        help='Sesión del asistente en borrador que tiene este producto. Mientras exista, no puede agregarse a otra sesión.')
+    biotex_classification_status = fields.Selection(
+        [('classifying', 'En clasificación')], string='Estado de clasificación en curso',
+        compute='_compute_classification_session', store=True, compute_sudo=True)
+
+    @api.depends('biotex_classification_line_ids.session_id.state')
+    def _compute_classification_session(self):
+        for p in self:
+            draft = p.biotex_classification_line_ids.filtered(lambda l: l.session_id.state == 'draft').sorted('id')[:1]
+            p.biotex_classification_session_id = draft.session_id
+            p.biotex_classification_status = 'classifying' if draft else False
+
     def action_open_classifier(self):
-        return {'type': 'ir.actions.client', 'tag': 'biotex_catalog.classification_workspace', 'name': 'Asistente de clasificación',
-                'context': {'biotex_product_ids': self.ids}}
+        """Abre el asistente en una pestaña nueva, sumando los productos a la última sesión activa del usuario.
+
+        La vista de productos permanece como estaba: la selección y el filtro no se pierden.
+        """
+        return self.env['biotex.classification.session'].workspace_open_from_products(self)
+
+    def action_open_classification_session(self):
+        self.ensure_one()
+        session = self.biotex_classification_session_id
+        if not session:
+            raise UserError('"%s" no está en ninguna clasificación en curso.' % self.display_name)
+        return {'type': 'ir.actions.act_url', 'target': 'new', 'url': '/biotex_catalog/classification/open/%d' % session.id}
 
     def action_print_qr_label(self):
         return self.env.ref('biotex_catalog.action_report_product_label_qr').report_action(self)
@@ -295,8 +321,8 @@ class ProductTemplate(models.Model):
         brand = self.env['biotex.brand'].browse(vals.get('biotex_brand_id')) if vals.get('biotex_brand_id') else self.env['biotex.brand']
         if not (fam and cls and brand and brand.code):
             return {'clave': '', 'generic': ''}
-        prefix = '%s-%s-%s-%s-' % (fam.biotex_group_id.code, brand.code, fam.biotex_code, cls.code)
         counter = self.env['biotex.product.sequence']
+        prefix = counter._prefix_for(fam.biotex_group_id.code, fam.biotex_code, cls.code, brand.code) + '-'
         current = self.browse(vals.get('id')).exists() if vals.get('id') else self.browse()
         if current:
             current.check_access('read')

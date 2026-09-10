@@ -5,8 +5,18 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 
-PREFIX = r'(?:[A-Z]{2}-[A-Z0-9]{4}-[A-Z0-9]{3}-[A-Z0-9]{3}|G-[A-Z]{2}-[A-Z0-9]{3}-[A-Z0-9]{3})'
+# Orden vigente: GG-FFF-CCC-MMMM (grupo, familia, clasificador, marca). Se sigue reconociendo el orden
+# anterior GG-MMMM-FFF-CCC para leer, reservar y conservar las claves ya generadas; ver docs/reordenamiento-folio.md.
+PREFIX_CURRENT = r'[A-Z]{2}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{4}'
+PREFIX_LEGACY = r'[A-Z]{2}-[A-Z0-9]{4}-[A-Z0-9]{3}-[A-Z0-9]{3}'
+PREFIX_GENERIC = r'G-[A-Z]{2}-[A-Z0-9]{3}-[A-Z0-9]{3}'
+PREFIX = r'(?:%s|%s|%s)' % (PREFIX_CURRENT, PREFIX_LEGACY, PREFIX_GENERIC)
 CODE = re.compile(r'^(' + PREFIX + r')-([0-9]+)$')
+
+
+def build_prefix(group_code, family_code, classifier_code, brand_code):
+    """Único constructor del prefijo comercial: GG-FFF-CCC-MMMM, sin guion final."""
+    return '%s-%s-%s-%s' % (group_code, family_code, classifier_code, brand_code)
 
 
 class BiotexProductSequence(models.Model):
@@ -24,6 +34,10 @@ class BiotexProductSequence(models.Model):
     def _split_code(self, code):
         match = CODE.fullmatch(code or '')
         return (match[1], int(match[2])) if match else None
+
+    @api.model
+    def _prefix_for(self, group_code, family_code, classifier_code, brand_code):
+        return build_prefix(group_code, family_code, classifier_code, brand_code)
 
     @api.model
     def _validate_prefix(self, prefix):
