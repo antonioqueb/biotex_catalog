@@ -53,6 +53,11 @@ modal, con un candado) y solo se actualizan los demás datos al confirmar. Si la
 abajo y se genera una clave nueva con revisión. Las claves con el orden anterior del folio se conservan tal cual
 (ver `reordenamiento-folio.md`).
 
+Si el producto ya tiene clave completa de **otra** clasificación, el asistente lo señala como "Otra clasificación" en el paso 2
+y, al agregarlo (o al abrirlo desde la lista de productos), muestra ambas claves y pide aceptar o cancelar: moverlo genera una
+clave nueva y altera su numeración. En la revisión final esos productos aparecen en rojo con su propia advertencia, y tras aplicar
+la línea queda marcada (`reclassified`) y en rojo en la tabla de resultados.
+
 **Generar claves** consulta el estado actual del catálogo y abre una revisión. Si cambiará una referencia existente, muestra producto, código anterior y código nuevo; exige marcar la aceptación antes de confirmar.
 
 La confirmación vuelve a comprobar la revisión en el servidor. Si cambió una línea o un producto, se solicita revisar de nuevo. La sesión y los productos se bloquean durante la confirmación para evitar una aplicación basada en datos concurrentemente modificados.

@@ -1,7 +1,7 @@
 {
     'name': 'Catálogo de insumos',
     'summary': 'Esquema v2: División > Grupo (etiqueta) > Familia > Clasificador, clave GG-MMMM-FFF-CCC-NN, genéricos, especialidades, equipos, marcas con código, fotos, asistente guiado, clasificación masiva por sesión, etiqueta QR',
-    'version': '19.0.3.4.0',
+    'version': '19.0.3.5.0',
     'category': 'Distribución de insumos',
     'author': 'Alphaqueb Consulting SAS',
     'license': 'LGPL-3',
@@ -31,5 +31,6 @@
             'biotex_catalog/static/src/**/*',
         ],
     },
+    'post_init_hook': 'post_init_hook',
     'installable': True,
 }

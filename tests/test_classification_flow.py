@@ -91,6 +91,33 @@ class TestClassificationFlow(TransactionCase):
         self.assertTrue(line.preserve_reference)
         self.assertEqual(line.reference, self.prefix + '-05')
 
+    def test_moving_a_classified_product_is_flagged_when_adding_confirming_and_after_apply(self):
+        product = self.classified_product(self.prefix + '-05', name='PRODUCTO CON OTRA CLAVE')
+        plain = self.product()
+        session = self.session(brand_id=self.other_brand.id)
+        # al buscar: la fila trae la clave actual para que el asistente pida confirmación
+        records = {r['id']: r for r in session.workspace_search_products('PRODUCTO CON OTRA CLAVE')['records']}
+        self.assertEqual(records[product.id]['reclassify_from'], self.prefix + '-05')
+        self.assertEqual(session._classified_elsewhere(plain), '', 'un producto sin clave no es reclasificación')
+        # desde la lista de productos: no se agrega a ciegas, queda pendiente de confirmar en el asistente
+        Session = self.env['biotex.classification.session'].with_user(self.operator)
+        Session.search([('user_id', '=', self.operator.id), ('state', '=', 'draft'), ('id', '!=', session.id)]).unlink()
+        (product | plain).with_user(self.operator).action_open_classifier()
+        self.assertEqual(session.line_ids.product_id, plain, 'el producto con otra clave espera la aceptación del usuario')
+        # aceptado: la línea avisa, la revisión final lo marca y al aplicar queda en rojo
+        session.workspace_add_products(product.ids)
+        line = session.line_ids.filtered(lambda l: l.product_id == product)
+        self.assertEqual(line._workspace_line()['reclassify_from'], self.prefix + '-05')
+        preview = session.workspace_confirmation_preview()
+        change = next(c for c in preview['changes'] if c['id'] == product.id)
+        self.assertTrue(change['reclassified'])
+        self.assertEqual((change['before'], change['after']), (self.prefix + '-05', line.reference))
+        session.workspace_confirm(expected_revision=preview['revision'])
+        self.assertTrue(line.reclassified)
+        self.assertFalse(session.line_ids.filtered(lambda l: l.product_id == plain).reclassified)
+        self.assertEqual(product.default_code, line.reference)
+        self.assertTrue(product.default_code.startswith(session.class_code + '-'))
+
     # ------------------------------------------------------------ bloqueo entre sesiones
     def test_product_in_a_draft_session_is_marked_and_cannot_join_another_session(self):
         product = self.product()

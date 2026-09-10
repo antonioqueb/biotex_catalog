@@ -102,6 +102,28 @@ class TestProductDetails(TransactionCase):
         queue = self.env['product.template'].biotex_classifier_queue([p.id])
         self.assertEqual(queue[0]['measure_rows'][0]['measure_type_id'], calibre.id)
 
+    def test_measure_units_come_from_the_uom_catalog(self):
+        Type = self.env['biotex.measure.type']
+        Type._ensure_units()
+        Uom = self.env['uom.uom']
+        for name in ('GA', 'FR', 'USP', 'MIC'):
+            self.assertTrue(Uom.search([('name', '=ilike', name)], limit=1), 'unidad típica %s creada en el catálogo' % name)
+        self.assertEqual(Uom.with_context(active_test=False).search_count([('name', '=ilike', 'MT')]), 0, 'MT no se duplica: ya existe m')
+        largo = self.env.ref('biotex_catalog.measure_type_lar')
+        suggested = largo._suggested_uoms()
+        self.assertEqual([u.name.lower() for u in suggested][:2], ['cm', 'm'])
+        p = self.product()
+        mm = Uom.search([('name', '=ilike', 'mm')], limit=1)
+        p.write({'biotex_measure_ids': [(0, 0, {'component': 'aguja', 'measure_type_id': largo.id, 'value': 32, 'unit_uom_id': mm.id}),
+                                        (0, 0, {'component': 'aguja', 'measure_type_id': largo.id, 'value': 40, 'unit': 'cm'})]})
+        rows = p.biotex_measure_ids.sorted('id')
+        self.assertEqual(rows[0].unit, 'MM', 'el texto de la unidad sigue al catálogo')
+        self.assertEqual(rows[1].unit_uom_id.name.lower(), 'cm', 'un texto que coincide con el catálogo se enlaza solo')
+        self.assertEqual(p.biotex_measure_ids._data()[0]['unit_uom_id'], mm.id)
+        with self.assertRaisesRegex(ValidationError, 'ya no existe'), self.cr.savepoint():
+            from ..models.product_details import clean_measures
+            clean_measures([{'component': 'x', 'measure_type_id': largo.id, 'value': 1, 'unit_uom_id': 999999}], self.env)
+
     def test_presentation_rows_carry_their_own_package_type(self):
         caja = self.env['biotex.package.type'].search([('name', '=ilike', 'caja')], limit=1) or self.env['biotex.package.type'].create({'name': 'Caja'})
         bolsa = self.env['biotex.package.type'].create({'name': 'Bolsa QA empaque'})

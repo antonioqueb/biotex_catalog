@@ -4,6 +4,8 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
 import { _t } from "@web/core/l10n/translation";
+import { markup } from "@odoo/owl";
+import { escape } from "@web/core/utils/strings";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { BiotexLineEditorDialog } from "./line_editor";
 import { BiotexClassificationReviewDialog } from "./review_dialog";
@@ -80,6 +82,7 @@ export class BiotexClassificationWorkspace extends Component {
         Object.assign(this.state, { tree: data.tree, brands: data.brands, uoms: data.uoms, drafts: data.drafts, loading: false });
         this.applySession(data.session);
         if (data.notice) this.notification.add(data.notice, { type: "warning", sticky: true });
+        if (this.state.session && data.pending_reclassify?.length) this.confirmReclassify(data.pending_reclassify);
         if (this.state.session) {
             // Una sesión creada desde la lista de productos puede traer productos sin clasificación todavía:
             // se empieza por la etapa 1 para fijarla y así reservar los consecutivos.
@@ -343,8 +346,39 @@ export class BiotexClassificationWorkspace extends Component {
     prevPage() { this.runSearch(Math.max(0, this.state.search.offset - PAGE_SIZE)); }
     nextPage() { this.runSearch(this.state.search.offset + PAGE_SIZE); }
 
+    /**
+     * Producto con clave completa de OTRA clasificación: mover de clasificación genera clave nueva y
+     * altera su numeración. Se muestran ambas claves y el usuario acepta o cancela.
+     */
+    confirmReclassify(items, onAccept = null) {
+        const list = items.map((it) => ({ name: it.name, code: it.code || it.reclassify_from, session_code: it.session_code || this.state.session?.class_code || "" }));
+        const body = markup(`<p>${escape(_t("Estás moviendo a otra clasificación productos que ya tienen clave completa. Al generar claves recibirán una referencia nueva y su numeración actual cambiará."))}</p>
+            <table class="table table-sm mb-2"><thead><tr><th>${escape(_t("Producto"))}</th><th>${escape(_t("Clave actual"))}</th><th>${escape(_t("Clasificación destino"))}</th></tr></thead><tbody>
+            ${list.map((it) => `<tr><td>${escape(it.name)}</td><td class="o_bcw_mono text-danger fw-bold">${escape(it.code)}</td><td class="o_bcw_mono">${escape(it.session_code)}-…</td></tr>`).join("")}
+            </tbody></table>`);
+        this.dialog.add(ConfirmationDialog, {
+            title: _t("Producto ya clasificado con otra clave"),
+            body,
+            confirmLabel: _t("Aceptar y agregar"),
+            confirmClass: "btn-danger",
+            cancelLabel: _t("Cancelar"),
+            confirm: async () => {
+                if (onAccept) return onAccept();
+                const data = await this.orm.call(MODEL, "workspace_add_products", [[this.state.session.id]], { product_ids: items.map((it) => it.id) });
+                this.applySession(data);
+                this.notifySkipped(data);
+                await this.runSearch(this.state.search.offset);
+            },
+            cancel: () => {},
+        });
+    }
+
     async addProduct(record, { clearQuery = false, query = this.state.search.query } = {}) {
         if (this.confirmed || this.state.busy || this.lines.some((line) => line.product_id === record.id)) return false;
+        if (record.reclassify_from && !record._reclassifyAccepted) {
+            this.confirmReclassify([record], () => this.addProduct({ ...record, _reclassifyAccepted: true }, { clearQuery, query }));
+            return false;
+        }
         this.state.busy = true;
         this.searchVersion++;
         try {

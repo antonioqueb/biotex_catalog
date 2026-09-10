@@ -105,6 +105,20 @@ class BiotexClassificationSession(models.Model):
                     session.classifier_id.code, session.family_id.biotex_composite))
 
     # ------------------------------------------------------------------ consecutivos
+    def _classified_elsewhere(self, product):
+        """Clave actual del producto si ya tiene clasificación completa distinta a la de esta sesión, o ''.
+
+        Es el caso que altera la numeración: al confirmar se genera clave nueva y el producto deja su
+        folio anterior. Se avisa al agregar, al confirmar y se marca en rojo al aplicar.
+        """
+        self.ensure_one()
+        if not self.complete or not self.env['biotex.product.sequence']._split_code(product.default_code):
+            return ''
+        complete = product.categ_id.biotex_level == 'family' and product.biotex_classifier_id and product.biotex_brand_id
+        same = (product.categ_id == self.family_id and product.biotex_classifier_id == self.classifier_id
+                and product.biotex_brand_id == self.brand_id)
+        return product.default_code if complete and not same else ''
+
     def _lock_workspace(self):
         if not self:
             return
@@ -245,7 +259,7 @@ class BiotexClassificationSession(models.Model):
     @api.model
     def workspace_bootstrap(self, session_id=None):
         """Todo lo que la pantalla necesita en una sola llamada: árbol, marcas, unidades y sesión."""
-        notice = ''
+        notice, pending_reclassify = '', []
         if not session_id and request:
             # Abierto en pestaña nueva desde la lista de productos: la sesión y los avisos vienen
             # de la sesión HTTP, no de la URL, y se consumen una sola vez.
@@ -254,11 +268,13 @@ class BiotexClassificationSession(models.Model):
                 request.session[HTTP_SESSION_KEY] = None
             session_id = pending.get('session_id')
             notice = pending.get('notice') or ''
+            pending_reclassify = pending.get('pending_reclassify') or []
         session = self.browse(session_id).exists() if session_id else self.browse()
         if session and session.state != 'draft':
             session = self.browse()
         return {
             'notice': notice,
+            'pending_reclassify': pending_reclassify if session else [],
             'tree': self.env['product.category'].biotex_get_tree(),
             'brands': self.env['biotex.brand'].search_read([], ['id', 'name', 'code'], order='name'),
             'uoms': self.env['uom.uom'].search_read([], ['id', 'name'], order='sequence, id'),
@@ -327,6 +343,8 @@ class BiotexClassificationSession(models.Model):
                 'brand': p.biotex_brand_id.name or '',
                 # en otra sesión en borrador: se muestra "En clasificación" y no se puede agregar
                 'locked_by': p.biotex_classification_session_id.name if p.biotex_classification_session_id and p.biotex_classification_session_id != self else '',
+                # clave completa de otra clasificación: el asistente pide confirmar antes de agregar
+                'reclassify_from': self._classified_elsewhere(p),
             } for p in products],
         }
 
@@ -394,13 +412,20 @@ class BiotexClassificationSession(models.Model):
         session = self.search([('state', '=', 'draft'), ('user_id', '=', self.env.uid)], order='write_date desc, id desc', limit=1)
         if not session:
             session = self.create({})
-        data = session.workspace_add_products(products.ids)
+        # Los productos con clave completa de otra clasificación no se agregan a ciegas: el asistente
+        # muestra ambas claves y pide aceptar o cancelar (pendientes viajan por la sesión HTTP).
+        pending = [{'id': p.id, 'name': p.display_name, 'code': code, 'session_code': session.class_code}
+                   for p in products for code in [session._classified_elsewhere(p)] if code]
+        direct = products.filtered(lambda p: p.id not in {x['id'] for x in pending})
+        data = session.workspace_add_products(direct.ids) if direct else {}
         skipped = data.get('skipped') or []
         if skipped and len(skipped) == len(products):
             raise UserError('Los productos seleccionados ya están en otra clasificación en curso:\n- ' + '\n- '.join(skipped))
         notice = ''
         if skipped:
             notice = 'No se agregaron %d producto(s) porque ya están en otra clasificación en curso: %s' % (len(skipped), '; '.join(skipped))
+        if request:
+            request.session[HTTP_SESSION_KEY] = {'session_id': session.id, 'notice': notice, 'pending_reclassify': pending}
         return {'type': 'ir.actions.act_url', 'target': 'new',
                 'url': '/biotex_catalog/classification/open/%d?notice=%s' % (session.id, url_quote(notice))}
 
@@ -485,7 +510,8 @@ class BiotexClassificationSession(models.Model):
             'catalogs': {
                 'uoms': self.env['uom.uom'].search_read([], ['id', 'name'], order='sequence, id'),
                 'package_types': self.env['biotex.package.type'].search_read([], ['id', 'name'], order='sequence, name'),
-                'measure_types': [{'id': t.id, 'code': t.code, 'name': t.name, 'units': t._unit_list(), 'description': t.description or ''}
+                'measure_types': [{'id': t.id, 'code': t.code, 'name': t.name, 'units': t._unit_list(), 'description': t.description or '',
+                                   'uom_ids': t._suggested_uoms().ids}
                                   for t in self.env['biotex.measure.type'].search([])],
                 'countries': self.env['res.country'].search_read([], ['id', 'name'], order='name'),
                 'brands': self.env['biotex.brand'].search_read([], ['id', 'name', 'code'], order='name'),
@@ -537,7 +563,8 @@ class BiotexClassificationSession(models.Model):
             product = line.product_id
             previous = product.default_code or ''
             if previous and previous != line.reference:
-                changes.append({'id': product.id, 'name': product.name, 'before': previous, 'after': line.reference})
+                changes.append({'id': product.id, 'name': product.name, 'before': previous, 'after': line.reference,
+                                'reclassified': bool(self._classified_elsewhere(product))})
             version.append([line._workspace_detail(), previous, str(product.write_date),
                             product.name, product.uom_id.id, line._classification_description(product),
                             product.biotex_measure_ids._data(), product._biotex_presentation_data()])
@@ -584,6 +611,9 @@ class BiotexClassificationSessionLine(models.Model):
     consecutive = fields.Integer(string='Consecutivo', readonly=True, copy=False,
                                 help='Se reserva al agregar el producto y no cambia al reordenar la lista.')
     reference = fields.Char(string='Referencia generada', compute='_compute_reference', store=True)
+    reclassified = fields.Boolean(
+        string='Cambió de clasificación', readonly=True, copy=False,
+        help='Al aplicar, el producto tenía clave completa de otra clasificación y recibió una clave nueva.')
     preserve_reference = fields.Boolean(
         string='Conserva clave y nombre', readonly=True, copy=False,
         help='El producto ya tenía clave completa de esta misma clasificación: se reclasifican sus datos sin regenerar la referencia ni cambiar el nombre.')
@@ -657,7 +687,7 @@ class BiotexClassificationSessionLine(models.Model):
         self.session_id._lock_workspace()
         if any(line.state == 'applied' or line.session_id.state != 'draft' for line in self):
             raise UserError('Conserve la línea aplicada en su sesión original.')
-        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name', 'consecutive', 'reference', 'preserve_reference'}):
+        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name', 'consecutive', 'reference', 'preserve_reference', 'reclassified'}):
             raise UserError('La identidad y el historial de la línea no se modifican manualmente.')
         if 'brand_id' in vals:
             raise UserError('La marca se toma de la clasificación principal.')
@@ -733,6 +763,8 @@ class BiotexClassificationSessionLine(models.Model):
             'consecutive_label': CONSECUTIVE_FORMAT % self.consecutive if self.consecutive else '',
             'reference': self.reference or '',
             'preserve_reference': self.preserve_reference,
+            'reclassify_from': '' if self.state == 'applied' else self.session_id._classified_elsewhere(self.product_id),
+            'reclassified': self.reclassified,
             'state': self.state,
             'brand_name': self.session_id.brand_id.display_name or '',
             'measure': self.measure or '',
@@ -778,6 +810,7 @@ class BiotexClassificationSessionLine(models.Model):
         product = self.product_id
         previous_reference = product.default_code or ''
         previous_classification = self._classification_description(product)
+        reclassified = bool(session._classified_elsewhere(product))
         vals = {
             'categ_id': session.family_id.id,
             'biotex_classifier_id': session.classifier_id.id,
@@ -823,7 +856,7 @@ class BiotexClassificationSessionLine(models.Model):
         applied_on = fields.Datetime.now()
         current_classification = self._classification_description(product)
         super(BiotexClassificationSessionLine, self).write({
-            'state': 'applied', 'applied_reference_before': previous_reference,
+            'state': 'applied', 'reclassified': reclassified, 'applied_reference_before': previous_reference,
             'applied_reference_after': product.default_code or '',
             'applied_classification_before': previous_classification,
             'applied_classification_after': current_classification,

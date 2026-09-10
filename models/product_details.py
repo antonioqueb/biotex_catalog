@@ -43,6 +43,21 @@ def clean_measures(rows, env=None):
             if found:
                 item['measure_type_id'] = found.id
                 item['measure_type'] = found.name
+        # La unidad sale del catálogo de unidades de medida (uom.uom); el nombre se conserva como texto.
+        uom_id = row.get('unit_uom_id') or False
+        if uom_id and env is not None:
+            uom = env['uom.uom'].browse(int(uom_id)).exists()
+            if not uom:
+                raise ValidationError('La unidad de medida elegida ya no existe.')
+            item['unit_uom_id'] = uom.id
+            item['unit'] = upper(uom.name)
+        elif uom_id:
+            item['unit_uom_id'] = int(uom_id)
+        elif env is not None and item['unit']:
+            found = env['uom.uom'].search([('name', '=ilike', item['unit'])], limit=1)
+            if found:
+                item['unit_uom_id'] = found.id
+                item['unit'] = upper(found.name)
         try:
             item['value'] = float(row.get('value', 0))
         except (ValueError, TypeError):
@@ -67,10 +82,11 @@ class ProductMeasure(models.Model):
     measure_type = fields.Char(string='Tipo de medida', required=True,
                                help='Nombre del atributo dimensional; se conserva como texto para armar las descripciones.')
     value = fields.Float(string='Valor', required=True, digits=(16, 6))
-    unit = fields.Char(string='Unidad', required=True)
+    unit_uom_id = fields.Many2one('uom.uom', string='Unidad de medida', ondelete='restrict', index=True)
+    unit = fields.Char(string='Unidad', required=True, help='Nombre de la unidad de medida; se conserva como texto para armar las descripciones.')
 
     def _with_type(self, vals):
-        """El texto del tipo sigue al atributo elegido; un texto sin atributo intenta reconocerlo en el catálogo."""
+        """El texto del tipo y de la unidad siguen al catálogo elegido; un texto sin catálogo intenta reconocerse."""
         vals = {**vals, **{k: upper(vals[k]) for k in ('component', 'measure_type', 'unit') if k in vals}}
         if vals.get('measure_type_id'):
             vals['measure_type'] = self.env['biotex.measure.type'].browse(vals['measure_type_id']).name
@@ -78,6 +94,12 @@ class ProductMeasure(models.Model):
             found = self.env['biotex.measure.type']._find_by_text(vals['measure_type'])
             if found:
                 vals.update(measure_type_id=found.id, measure_type=found.name)
+        if vals.get('unit_uom_id'):
+            vals['unit'] = upper(self.env['uom.uom'].browse(vals['unit_uom_id']).name)
+        elif vals.get('unit') and 'unit_uom_id' not in vals:
+            uom = self.env['uom.uom'].search([('name', '=ilike', vals['unit'])], limit=1)
+            if uom:
+                vals.update(unit_uom_id=uom.id, unit=upper(uom.name))
         return vals
 
     @api.model_create_multi
@@ -92,9 +114,14 @@ class ProductMeasure(models.Model):
         for row in self:
             if row.measure_type_id:
                 row.measure_type = row.measure_type_id.name
-                units = row.measure_type_id._unit_list()
-                if units and not row.unit:
-                    row.unit = units[0]
+                if not row.unit_uom_id:
+                    row.unit_uom_id = row.measure_type_id._suggested_uoms()[:1]
+
+    @api.onchange('unit_uom_id')
+    def _onchange_unit_uom_id(self):
+        for row in self:
+            if row.unit_uom_id:
+                row.unit = upper(row.unit_uom_id.name)
 
     @api.constrains('component','measure_type','value','unit')
     def _check_measure(self):
@@ -106,7 +133,7 @@ class ProductMeasure(models.Model):
 
     def _data(self):
         return [{'component': r.component, 'measure_type_id': r.measure_type_id.id or False, 'measure_type': r.measure_type,
-                 'value': r.value, 'unit': r.unit} for r in self]
+                 'value': r.value, 'unit_uom_id': r.unit_uom_id.id or False, 'unit': r.unit} for r in self]
 
 
 class ProductCodeHistory(models.Model):

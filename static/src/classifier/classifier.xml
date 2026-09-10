@@ -152,8 +152,11 @@
                                             </td>
                                             <td><input type="number" min="0" step="any" class="form-control form-control-sm" t-att-value="row.value" t-on-input="(ev) => this.onMeasure(row_index, 'value', ev)"/></td>
                                             <td>
-                                                <input class="form-control form-control-sm" t-att-list="'bcl_units_' + row_index" t-att-placeholder="unitsFor(row).join(' / ') || 'MM / CM'" t-att-value="row.unit" t-on-input="(ev) => this.onMeasure(row_index, 'unit', ev)"/>
-                                                <datalist t-att-id="'bcl_units_' + row_index"><option t-foreach="unitsFor(row)" t-as="u" t-key="u" t-att-value="u"/></datalist>
+                                                <select class="form-select form-select-sm" t-on-change="(ev) => this.onMeasure(row_index, 'unit_uom_id', ev)">
+                                                    <option value="" t-att-selected="!row.unit_uom_id" t-esc="(!row.unit_uom_id and row.unit) ? row.unit : '— Unidad —'"/>
+                                                    <optgroup t-if="suggestedUoms(row).length" label="Sugeridas para el atributo"><option t-foreach="suggestedUoms(row)" t-as="u" t-key="u.id" t-att-value="u.id" t-att-selected="u.id === row.unit_uom_id" t-esc="u.name"/></optgroup>
+                                                    <optgroup label="Todas las unidades"><option t-foreach="otherUoms(row)" t-as="u" t-key="u.id" t-att-value="u.id" t-att-selected="u.id === row.unit_uom_id" t-esc="u.name"/></optgroup>
+                                                </select>
                                             </td>
                                             <td><button type="button" class="btn btn-link btn-sm text-danger" aria-label="Quitar medida" t-on-click="() => this.removeMeasure(row_index)"><i class="fa fa-trash"/></button></td>
                                         </tr>

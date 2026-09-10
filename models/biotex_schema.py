@@ -273,6 +273,35 @@ class BiotexMeasureType(models.Model):
         self.ensure_one()
         return [u.strip().upper() for u in (self.typical_units or '').split(',') if u.strip() and u.strip().upper() != 'ND']
 
+    # Abreviaturas del esquema que ya existen en Odoo con otro nombre: no se duplican.
+    UOM_ALIASES = {'MT': ('m',), 'LT': ('L',), 'GR': ('g',), 'ML': ('mL',), 'KG': ('kg',), 'MM': ('mm',), 'CM': ('cm',)}
+
+    @api.model
+    def _uom_for(self, name):
+        Uom = self.env['uom.uom'].with_context(active_test=False)
+        for candidate in (name,) + self.UOM_ALIASES.get(name, ()):
+            uom = Uom.search([('name', '=ilike', candidate)], limit=1)
+            if uom:
+                return uom
+        return Uom
+
+    def _suggested_uoms(self):
+        """Unidades del catálogo uom.uom que corresponden a las unidades típicas del atributo, en su orden."""
+        self.ensure_one()
+        found = self.env['uom.uom']
+        for name in self._unit_list():
+            found |= self._uom_for(name).filtered('active')
+        return found
+
+    @api.model
+    def _ensure_units(self):
+        """Crea en el catálogo de unidades de medida las unidades típicas que aún no existan (GA, FR, USP, MIC…)."""
+        created = self.env['uom.uom']
+        for name in sorted({u for t in self.search([]) for u in t._unit_list()}):
+            if not self._uom_for(name):
+                created |= self.env['uom.uom'].sudo().create({'name': name})
+        return created
+
     @api.model
     def _find_by_text(self, text):
         """Atributo cuyo nombre o clave coincide con un texto libre (para medidas capturadas antes del catálogo)."""

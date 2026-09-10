@@ -40,11 +40,11 @@ export class BiotexClassifier extends Component {
             step: 0, tree: [], queue: [], queueIndex: 0, product: EMPTY(), familySearch: "", classifierSearch: "",
             brands: [], brandSearch: "", brandSimilar: [], newBrandCode: "", manufacturers: [], manufacturerName: "",
             distributors: [], distributorName: "", countries: [], countryName: "", equipments: [], equipmentSearch: "", equipmentLabels: {},
-            specialties: [], packageTypes: [], measureTypes: [], preview: { clave: "", generic: "" }, saving: false, done: 0,
+            specialties: [], packageTypes: [], measureTypes: [], uoms: [], preview: { clave: "", generic: "" }, saving: false, done: 0,
         });
         onWillStart(async () => {
             const ctx = this.props.action?.context || {};
-            const [tree, queue, brands, specialties, countries, packageTypes, measureTypes] = await Promise.all([
+            const [tree, queue, brands, specialties, countries, packageTypes, measureTypes, uoms] = await Promise.all([
                 this.orm.call("product.category", "biotex_get_tree", []),
                 this.orm.call("product.template", "biotex_classifier_queue", [ctx.biotex_product_ids || null]),
                 this.orm.searchRead("biotex.brand", [], ["id", "name", "code"], { limit: 1000, order: "name" }),
@@ -52,9 +52,16 @@ export class BiotexClassifier extends Component {
                 this.orm.searchRead("res.country", [], ["id", "name"], { order: "name" }),
                 this.orm.searchRead("biotex.package.type", [], ["id", "name"], { order: "sequence, name" }),
                 this.orm.searchRead("biotex.measure.type", [], ["id", "name", "code", "typical_units", "description"], { order: "sequence, name" }),
+                this.orm.searchRead("uom.uom", [], ["id", "name"], { order: "name" }),
             ]);
-            measureTypes.forEach((t) => { t.units = (t.typical_units || "").split(",").map((u) => u.trim().toUpperCase()).filter((u) => u && u !== "ND"); });
-            Object.assign(this.state, { tree, queue, brands, specialties, countries, packageTypes, measureTypes });
+            // unidades típicas del atributo → registros del catálogo de unidades (por nombre, con alias m/L/g/mL)
+            const alias = { MT: "m", LT: "L", GR: "g", ML: "mL", KG: "kg", MM: "mm", CM: "cm" };
+            const byName = (name) => uoms.find((u) => u.name.toUpperCase() === name.toUpperCase()) || uoms.find((u) => alias[name] && u.name === alias[name]);
+            measureTypes.forEach((t) => {
+                t.units = (t.typical_units || "").split(",").map((u) => u.trim().toUpperCase()).filter((u) => u && u !== "ND");
+                t.uoms = t.units.map(byName).filter(Boolean);
+            });
+            Object.assign(this.state, { tree, queue, brands, specialties, countries, packageTypes, measureTypes, uoms });
             this.loadCurrent();
         });
     }
@@ -116,14 +123,16 @@ export class BiotexClassifier extends Component {
     onSelect(field, ev) { this.state.product[field] = parseInt(ev.target.value, 10) || false; }
     // ------------------------------------------------------------ medidas estructuradas
     get measuresValid() {
-        return this.state.product.measure_rows.every((r) => r.component.trim() && r.measure_type_id && r.unit.trim() && Number(r.value) > 0);
+        return this.state.product.measure_rows.every((r) => r.component.trim() && r.measure_type_id && r.unit_uom_id && Number(r.value) > 0);
     }
     get measuresText() {
         return this.state.product.measure_rows
             .map((r) => [r.component, r.measure_type, r.value, r.unit].filter((x) => x !== "" && x !== false).join(" ")).join("; ");
     }
-    unitsFor(row) { return this.state.measureTypes.find((t) => t.id === row.measure_type_id)?.units || []; }
-    addMeasure() { this.state.product.measure_rows.push({ component: "", measure_type_id: false, measure_type: "", value: "", unit: "" }); }
+    suggestedUoms(row) { return this.state.measureTypes.find((t) => t.id === row.measure_type_id)?.uoms || []; }
+    otherUoms(row) { const s = new Set(this.suggestedUoms(row).map((u) => u.id)); return this.state.uoms.filter((u) => !s.has(u.id)); }
+    setRowUom(row, uomId) { row.unit_uom_id = uomId; row.unit = (this.state.uoms.find((u) => u.id === uomId)?.name || "").toUpperCase(); }
+    addMeasure() { this.state.product.measure_rows.push({ component: "", measure_type_id: false, measure_type: "", value: "", unit_uom_id: false, unit: "" }); }
     removeMeasure(i) { this.state.product.measure_rows.splice(i, 1); }
     onMeasure(i, field, ev) {
         const row = this.state.product.measure_rows[i];
@@ -132,7 +141,10 @@ export class BiotexClassifier extends Component {
             row.measure_type_id = parseInt(raw, 10) || false;
             const type = this.state.measureTypes.find((t) => t.id === row.measure_type_id);
             row.measure_type = type ? type.name : "";
-            if (type && !row.unit && type.units.length) row.unit = type.units[0];
+            const suggested = this.suggestedUoms(row);
+            if (!row.unit_uom_id && suggested.length) this.setRowUom(row, suggested[0].id);
+        } else if (field === "unit_uom_id") {
+            this.setRowUom(row, parseInt(raw, 10) || false);
         } else if (field === "value") {
             row.value = raw === "" ? "" : Number(raw);
         } else {

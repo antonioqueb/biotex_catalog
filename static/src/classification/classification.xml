@@ -191,6 +191,7 @@
                                         <td class="o_bcw_cell_name">
                                             <t t-esc="record.name"/>
                                             <span t-if="record.locked_by" class="o_bcw_badge o_bcw_badge_warn" t-att-title="'En clasificación en curso: ' + record.locked_by">En clasificación</span>
+                                            <span t-if="record.reclassify_from and !record.locked_by" class="o_bcw_badge o_bcw_badge_danger" t-att-title="'Ya clasificado con la clave ' + record.reclassify_from + '. Agregarlo aquí le genera una clave nueva.'">Otra clasificación</span>
                                         </td>
                                         <td class="o_bcw_mono"><t t-esc="record.default_code or record.reference or '—'"/></td>
                                         <td><t t-esc="record.brand or '—'"/></td>
@@ -278,7 +279,7 @@
                                 </thead>
                                 <tbody>
                                     <tr t-foreach="lines" t-as="line" t-key="line.id"
-                                        t-att-class="{o_bcw_dragging: state.dragId === line.id, o_bcw_dragover: state.overId === line.id}"
+                                        t-att-class="{o_bcw_dragging: state.dragId === line.id, o_bcw_dragover: state.overId === line.id, o_bcw_row_reclassified: line.reclassified or line.reclassify_from}"
                                         t-on-dragover.prevent="() => this.onDragOver(line)"
                                         t-on-drop.prevent="() => this.onDrop(line)">
                                         <td class="o_bcw_w_grip">
@@ -307,6 +308,8 @@
                                         <td class="o_bcw_mono o_bcw_ref">
                                             <t t-esc="line.reference or '—'"/>
                                             <i t-if="line.preserve_reference" class="fa fa-lock o_bcw_lock" aria-hidden="true" title="Clave conservada: el producto ya estaba clasificado"/>
+                                            <i t-if="line.reclassify_from or line.reclassified" class="fa fa-exclamation-circle o_bcw_reclass" aria-hidden="true"
+                                               t-att-title="line.reclassified ? 'Cambió de clasificación: antes ' + (line.old_reference || '—') : 'Ya clasificado con la clave ' + line.reclassify_from + '. Al generar claves recibirá una nueva.'"/>
                                         </td>
                                         <td class="o_bcw_mono"><t t-esc="line.preserve_reference ? '—' : (line.consecutive_label or '—')"/></td>
                                         <td class="o_bcw_w_img">
@@ -333,6 +336,7 @@
                             Puedes cambiar el orden de los productos arrastrando el icono de 6 puntos.
                             El consecutivo no cambia al reordenar: se reserva al agregar el producto.
                             <t t-if="lines.some((l) => l.preserve_reference)"> Los productos con <i class="fa fa-lock" aria-hidden="true"/> ya tenían clave de esta clasificación: conservan referencia y nombre; solo se actualizan sus demás datos.</t>
+                            <t t-if="lines.some((l) => l.reclassify_from or l.reclassified)"> Los productos <span class="text-danger fw-bold">en rojo</span> tenían clave completa de otra clasificación: <t t-if="confirmed">recibieron una clave nueva.</t><t t-else="">recibirán una clave nueva y su numeración cambiará.</t></t>
                         </p>
                         <p t-if="!classificationComplete" class="o_bcw_warn">Completa la clasificación en la etapa 1 para reservar los consecutivos y poder generar las claves.</p>
                     </t>
@@ -380,6 +384,14 @@
         <div t-if="state.loading" class="o_bcw_modal_loading"><i class="fa fa-circle-o-notch fa-spin fa-2x"/></div>
 
         <div t-else="" class="o_bcw_modal_body o_bcw_editor_flow">
+            <div t-if="errorMessages.length" class="o_bcw_error_bar" role="alert">
+                <i class="fa fa-exclamation-circle" aria-hidden="true"/>
+                <div class="o_bcw_error_bar_text">
+                    <strong>Hay <t t-esc="errorMessages.length"/> dato(s) por corregir.</strong>
+                    <span t-esc="errorMessages[0]"/>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" t-on-click="scrollToFirstError">Ir al campo</button>
+            </div>
 
             <!-- ============================================== datos principales -->
             <section class="o_bcw_editor_block" aria-label="Datos principales">
@@ -457,8 +469,15 @@
                             </td>
                             <td><input aria-label="Valor" class="o_bcw_input" type="number" min="0" step="any" t-att-value="row.value" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'value', ev)"/></td>
                             <td>
-                                <input aria-label="Unidad de la medida" class="o_bcw_input" t-att-list="'bcw_units_' + row_index" t-att-placeholder="unitsFor(row).join(' / ') || 'MM / CM / ML'" t-att-value="row.unit" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'unit', ev)"/>
-                                <datalist t-att-id="'bcw_units_' + row_index"><option t-foreach="unitsFor(row)" t-as="u" t-key="u" t-att-value="u"/></datalist>
+                                <select aria-label="Unidad de la medida" class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onRow('measure_data', row_index, 'unit_uom_id', ev)">
+                                    <option value="" t-att-selected="!row.unit_uom_id" t-esc="(!row.unit_uom_id and row.unit) ? row.unit : '— Unidad —'"/>
+                                    <optgroup t-if="suggestedUoms(row).length" label="Sugeridas para el atributo">
+                                        <option t-foreach="suggestedUoms(row)" t-as="u" t-key="u.id" t-att-value="u.id" t-att-selected="u.id === row.unit_uom_id" t-esc="u.name"/>
+                                    </optgroup>
+                                    <optgroup label="Todas las unidades">
+                                        <option t-foreach="otherUoms(row)" t-as="u" t-key="u.id" t-att-value="u.id" t-att-selected="u.id === row.unit_uom_id" t-esc="u.name"/>
+                                    </optgroup>
+                                </select>
                             </td>
                             <td><button t-if="!props.readonly" class="btn btn-link" aria-label="Quitar medida" t-on-click="() => this.removeRow('measure_data', row_index)"><i class="fa fa-trash"/></button></td>
                         </tr>
@@ -650,20 +669,22 @@
                 </div>
             </section>
 
-            <div t-if="state.confirmClose" class="o_bcw_confirm">
-                <div class="o_bcw_confirm_box">
-                    <p class="o_bcw_confirm_text">¿Deseas salir sin guardar los cambios?</p>
-                    <div class="o_bcw_confirm_actions">
-                        <button class="btn btn-secondary" t-on-click="keepEditing">Continuar editando</button>
-                        <button class="btn btn-outline-danger" t-on-click="discardAndClose">Salir sin guardar</button>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <t t-set-slot="footer">
             <button class="btn btn-primary" t-att-disabled="props.readonly or state.saving or state.readingImages" t-on-click="save">Guardar cambios</button>
             <button class="btn btn-secondary" t-on-click="requestClose">Cancelar</button>
+        </t>
+    </Dialog>
+</t>
+
+<t t-name="biotex_catalog.ClassificationLeaveDialog">
+    <Dialog size="'md'" title="'Cambios sin guardar'">
+        <p class="mb-0">¿Deseas guardar los cambios o salir de la edición sin guardarlos?</p>
+        <t t-set-slot="footer">
+            <button t-if="props.canSave" type="button" class="btn btn-primary" t-on-click="save">Guardar cambios</button>
+            <button type="button" class="btn btn-outline-danger" t-on-click="discard">Salir sin guardar</button>
+            <button type="button" class="btn btn-secondary" t-on-click="props.close">Seguir editando</button>
         </t>
     </Dialog>
 </t>

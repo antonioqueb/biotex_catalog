@@ -12,6 +12,8 @@ export class BiotexClassificationReviewDialog extends Component {
         this.notification = useService("notification");
         this.state = useState({ acknowledged: false, saving: false });
     }
+    /** Productos con clave completa de otra clasificación: el caso que altera la numeración. */
+    get reclassified() { return this.props.preview.changes.filter((c) => c.reclassified); }
 
     async confirm() {
         if (this.state.saving || (this.props.preview.changes.length && !this.state.acknowledged)) return;

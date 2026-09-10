@@ -9,19 +9,24 @@
                         <i class="fa fa-exclamation-triangle me-2" aria-hidden="true"/>
                         <strong t-esc="props.preview.changes.length"/> productos ya tienen una referencia que cambiará. Revisa cada cambio antes de continuar.
                     </div>
+                    <div t-if="reclassified.length" class="alert alert-danger mb-0" role="alert">
+                        <i class="fa fa-exclamation-circle me-2" aria-hidden="true"/>
+                        <strong t-esc="reclassified.length"/> producto(s) <strong>ya clasificados con otra clave completa</strong> se mueven a esta clasificación (en rojo): recibirán una clave nueva y su numeración actual cambiará.
+                    </div>
                     <div class="o_bcw_review_scroll" role="region" aria-label="Referencias que cambiarán" tabindex="0">
                         <table class="table table-sm o_list_table mb-0">
                             <thead><tr><th>Producto</th><th>Referencia anterior</th><th>Referencia nueva</th></tr></thead>
                             <tbody>
-                                <tr t-foreach="props.preview.changes" t-as="change" t-key="change.id">
-                                    <td t-esc="change.name"/><td class="o_bcw_mono" t-esc="change.before"/><td class="o_bcw_mono" t-esc="change.after"/>
+                                <tr t-foreach="props.preview.changes" t-as="change" t-key="change.id" t-att-class="{ 'table-danger': change.reclassified }">
+                                    <td><t t-esc="change.name"/><span t-if="change.reclassified" class="badge text-bg-danger ms-2">Cambia de clasificación</span></td>
+                                    <td class="o_bcw_mono" t-esc="change.before"/><td class="o_bcw_mono" t-esc="change.after"/>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <label class="form-check mb-0">
                         <input class="form-check-input" type="checkbox" t-model="state.acknowledged" t-att-disabled="state.saving"/>
-                        <span class="form-check-label">Revisé las referencias anteriores y confirmo esta reclasificación.</span>
+                        <span class="form-check-label">Revisé las referencias anteriores<t t-if="reclassified.length"> y acepto que los productos en rojo cambien de clasificación y de numeración</t>. Confirmo esta reclasificación.</span>
                     </label>
                 </t>
             </div>

@@ -281,6 +281,11 @@
         font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; vertical-align: middle;
     }
     .o_bcw_badge_warn { background: var(--bcw-classifier-soft); color: #c2410c; }
+    .o_bcw_badge_danger { background: #fee4e2; color: #b42318; }
+    .o_bcw_reclass { margin-left: 6px; color: #b42318; font-size: 12px; }
+    .o_bcw_table tbody tr.o_bcw_row_reclassified td { background: #fef3f2; color: #b42318; }
+    .o_bcw_table tbody tr.o_bcw_row_reclassified:hover td { background: #fee4e2; }
+    .o_bcw_table tbody tr.o_bcw_row_reclassified .o_bcw_input { border-color: #fda29b; }
     .o_bcw_lock { margin-left: 6px; color: var(--bcw-ink-2); font-size: 11px; }
     .o_bcw_warn { color: #b26a00; font-size: 12.5px; margin: 8px 0 0; }
 
@@ -411,6 +416,15 @@
     strong { color: var(--bcw-ink); font-weight: 600; overflow-wrap: anywhere; }
 }
 .o_bcw_rows { margin-bottom: 0; th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-muted, #7b8b89); font-weight: 700; border-bottom-color: var(--bcw-rule); } td { vertical-align: middle; border-bottom-color: #f0f2f5; } }
+
+// aviso de validación fijo en la parte superior del modal: visible sin importar el scroll
+.o_bcw_error_bar {
+    position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    background: #fef3f2; border: 1px solid #fda29b; border-radius: 8px; color: #b42318;
+    > i { font-size: 18px; flex: 0 0 auto; }
+    .btn { flex: 0 0 auto; margin-left: auto; }
+}
+.o_bcw_error_bar_text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; strong { font-weight: 700; } }
 
 // empacados: cantidad seguida de la unidad indivisible base (solo lectura)
 .o_bcw_qty_unit { display: flex; align-items: stretch; min-width: 0; }

@@ -30,7 +30,7 @@
                     <field name="biotex_measure_ids"><list editable="bottom">
                         <field name="sequence" widget="handle"/><field name="component"/>
                         <field name="measure_type_id" options="{'no_create': True}"/><field name="measure_type" column_invisible="1"/>
-                        <field name="value"/><field name="unit"/>
+                        <field name="value"/><field name="unit_uom_id" options="{'no_create': True}"/><field name="unit" column_invisible="1"/>
                     </list></field>
                     <group><field name="biotex_measure" string="Medidas anteriores (texto opcional)"/></group>
                 </page>

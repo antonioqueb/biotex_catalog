@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, useState, useRef, onWillStart, onMounted } from "@odoo/owl";
+import { Component, useState, useRef, onWillStart, onMounted, onPatched } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
@@ -11,6 +11,18 @@ const LOCAL_LOOKUPS = ["country", "specialty"];
 class BiotexEditorDialog extends Dialog {
     static props = { ...Dialog.props, requestClose: Function };
     dismiss() { return this.props.requestClose(); }
+}
+
+/**
+ * "¿Guardar los cambios o salir de la edición?" Se abre como diálogo independiente encima del modal,
+ * centrado en la ventana: no depende de la posición de scroll del formulario largo.
+ */
+class BiotexLeaveDialog extends Component {
+    static template = "biotex_catalog.ClassificationLeaveDialog";
+    static components = { Dialog };
+    static props = { close: Function, onSave: Function, onDiscard: Function, canSave: Boolean };
+    save() { this.props.close(); this.props.onSave(); }
+    discard() { this.props.close(); this.props.onDiscard(); }
 }
 
 class BiotexPhotoPreviewDialog extends Component {
@@ -53,7 +65,6 @@ export class BiotexLineEditorDialog extends Component {
             initial: {},
             errors: {},
             saving: false,
-            confirmClose: false,
             detailsOpen: true,
             readingImages: 0,
             photoPreviews: {},
@@ -63,6 +74,14 @@ export class BiotexLineEditorDialog extends Component {
             manufacturerSuggested: false,
         });
         onMounted(() => this.nameInput.el?.focus());
+        // El desplazamiento al primer error se hace cuando el DOM ya muestra las marcas de error.
+        this.pendingErrorScroll = false;
+        onPatched(() => {
+            if (this.pendingErrorScroll) {
+                this.pendingErrorScroll = false;
+                this.focusFirstError();
+            }
+        });
         onWillStart(async () => {
             const data = await this.orm.call("biotex.classification.session", "workspace_line_detail", [
                 [this.props.sessionId], this.props.lineId,
@@ -296,12 +315,17 @@ export class BiotexLineEditorDialog extends Component {
         // Cada empacado lleva su propio tipo (caja, bolsa, estuche…), su cantidad de unidades indivisibles y su código.
         // Cada medida elige un atributo dimensional del catálogo (calibre, largo, volumen…) y su unidad.
         this.state.draft[kind].push(kind === "measure_data"
-            ? { component: "", measure_type_id: false, measure_type: "", value: "", unit: "" }
+            ? { component: "", measure_type_id: false, measure_type: "", value: "", unit_uom_id: false, unit: "" }
             : { package_type_id: false, name: "", quantity: 1, barcode: "" });
     }
-    /** Unidades típicas del atributo elegido en la fila, para sugerirlas al capturar. */
-    unitsFor(row) {
-        return this.state.catalogs.measure_types.find((t) => t.id === row.measure_type_id)?.units || [];
+    /** Unidades del catálogo (uom.uom) sugeridas para el atributo elegido en la fila. */
+    suggestedUoms(row) {
+        const ids = this.state.catalogs.measure_types.find((t) => t.id === row.measure_type_id)?.uom_ids || [];
+        return ids.map((id) => this.state.catalogs.uoms.find((u) => u.id === id)).filter(Boolean);
+    }
+    otherUoms(row) {
+        const suggested = new Set(this.suggestedUoms(row).map((u) => u.id));
+        return this.state.catalogs.uoms.filter((u) => !suggested.has(u.id));
     }
     /** Etiqueta de un empacado ya guardado sin tipo reconocido: se muestra su nombre de unidad tal cual. */
     rowTypeLabel(row) {
@@ -309,6 +333,10 @@ export class BiotexLineEditorDialog extends Component {
     }
     removeRow(kind, index) {
         this.state.draft[kind].splice(index, 1);
+    }
+    setRowUom(row, uomId) {
+        row.unit_uom_id = uomId;
+        row.unit = (this.state.catalogs.uoms.find((u) => u.id === uomId)?.name || "").toUpperCase();
     }
     onRow(kind, index, field, ev) {
         const raw = ev.target.value;
@@ -322,7 +350,12 @@ export class BiotexLineEditorDialog extends Component {
             row.measure_type_id = parseInt(raw, 10) || false;
             const type = this.state.catalogs.measure_types.find((t) => t.id === row.measure_type_id);
             row.measure_type = type ? type.name : "";
-            if (type && !row.unit && type.units.length) row.unit = type.units[0];  // primera unidad típica como sugerencia
+            const suggested = this.suggestedUoms(row);
+            if (!row.unit_uom_id && suggested.length) this.setRowUom(row, suggested[0].id);  // primera unidad típica como sugerencia
+            return;
+        }
+        if (field === "unit_uom_id") {
+            this.setRowUom(row, parseInt(raw, 10) || false);
             return;
         }
         row[field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
@@ -345,12 +378,28 @@ export class BiotexLineEditorDialog extends Component {
         if (!this.state.draft.uom_id) errors.uom_id = _t("Selecciona la unidad de medida.");
         const qty = this.state.draft.package_qty;
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
-        if (this.state.draft.measure_data.some((r) => !r.component.trim() || !(r.measure_type_id || (r.measure_type || "").trim()) || !r.unit.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, atributo dimensional, valor positivo y unidad en cada medida.");
+        if (this.state.draft.measure_data.some((r) => !r.component.trim() || !(r.measure_type_id || (r.measure_type || "").trim()) || !(r.unit_uom_id || (r.unit || "").trim()) || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, atributo dimensional, valor positivo y unidad en cada medida.");
         const presentations = this.state.draft.presentation_data;
         if (presentations.some((r) => (!r.package_type_id && !(r.name || "").trim()) || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada empacado requiere tipo de empaque, cantidad entera positiva y un código de barras distinto.");
         this.state.errors = errors;
         if (errors.package_qty) this.state.detailsOpen = true;
+        if (Object.keys(errors).length) this.scrollToFirstError();
         return !Object.keys(errors).length;
+    }
+    /** Lista legible de errores para el aviso fijo en la parte superior del modal. */
+    get errorMessages() { return Object.values(this.state.errors); }
+    /** El formulario es largo: la vista se desplaza al primer campo con error y lo enfoca. */
+    scrollToFirstError() {
+        this.pendingErrorScroll = true;
+        this.render();
+    }
+    focusFirstError() {
+        const root = this.nameInput.el?.closest(".o_bcw_modal_body") || document;
+        const target = root.querySelector(".o_bcw_input--error, .o_bcw_error");
+        if (!target) return;
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        const field = target.closest(".o_bcw_field")?.querySelector("input, select, textarea");
+        (target.matches("input, select, textarea") ? target : field)?.focus({ preventScroll: true });
     }
 
     // ------------------------------------------------------------------ guardar / cancelar
@@ -376,15 +425,13 @@ export class BiotexLineEditorDialog extends Component {
     requestClose() {
         if (this.state.saving || this.state.readingImages) return;
         if (this.dirty && !this.props.readonly) {
-            this.state.confirmClose = true;
+            this.dialog.add(BiotexLeaveDialog, {
+                canSave: !this.props.readonly,
+                onSave: () => this.save(),
+                onDiscard: () => this.props.close(),
+            });
             return;
         }
-        this.props.close();
-    }
-    keepEditing() {
-        this.state.confirmClose = false;
-    }
-    discardAndClose() {
         this.props.close();
     }
 }

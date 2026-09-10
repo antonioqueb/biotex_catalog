@@ -18,6 +18,10 @@ class ClassificationOpen(http.Controller):
         session = request.env['biotex.classification.session'].browse(session_id).exists()
         if session:
             session.check_access('read')
-        request.session[HTTP_SESSION_KEY] = {'session_id': session.id if session else False, 'notice': (notice or '')[:1000]}
+        # La acción de la lista pudo dejar productos pendientes de confirmar (cambio de clasificación): se conservan.
+        current = request.session.get(HTTP_SESSION_KEY) or {}
+        pending = current.get('pending_reclassify') if session and current.get('session_id') == session.id else []
+        request.session[HTTP_SESSION_KEY] = {'session_id': session.id if session else False, 'notice': (notice or '')[:1000],
+                                             'pending_reclassify': pending or []}
         action = request.env.ref('biotex_catalog.action_biotex_classifier')
         return request.redirect('/odoo/action-%d' % action.id)
