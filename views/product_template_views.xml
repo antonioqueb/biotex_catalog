@@ -51,6 +51,7 @@
                             <field name="biotex_legacy_code"/>
                             <field name="biotex_manufacturer_id"/>
                             <field name="biotex_country_id"/>
+                            <field name="biotex_country_ids" widget="many2many_tags"/>
                             <field name="biotex_primary_distributor_id"/>
                         </group>
                         <group string="Uso clínico">

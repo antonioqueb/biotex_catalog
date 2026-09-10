@@ -26,6 +26,19 @@
     --bcw-surface-2: #f7f8fa;
 
     .btn:not(.btn-close) { border-radius: 999px; }
+
+    // tonos por nivel: se usan en las tarjetas, en la clave y en la referencia del modal de edición
+    .o_bcw_tone_group   { --tone: var(--bcw-group);      --tone-soft: var(--bcw-group-soft); }
+    .o_bcw_tone_family  { --tone: var(--bcw-family);     --tone-soft: var(--bcw-family-soft); }
+    .o_bcw_tone_classifier { --tone: var(--bcw-classifier); --tone-soft: var(--bcw-classifier-soft); }
+    .o_bcw_tone_brand   { --tone: var(--bcw-brand);      --tone-soft: var(--bcw-brand-soft); }
+    .o_bcw_tone_consecutive { --tone: var(--bcw-ink); --tone-soft: var(--bcw-surface-2); }
+
+    .o_bcw_code { display: inline-flex; flex-wrap: wrap; align-items: baseline; line-height: 1.5; font-family: var(--o-font-family-monospace, monospace); font-size: 22px; font-weight: 700; }
+    .o_bcw_code_sm { font-size: 14px; }
+    .o_bcw_code_empty { font-family: inherit; font-size: 12px; font-weight: 400; color: var(--bcw-ink-2); font-style: italic; }
+    .o_bcw_seg { color: var(--tone); }
+    .o_bcw_dash { color: var(--bcw-ink-2); padding: 0 1px; }
 }
 
 @mixin bcw-input {
@@ -45,12 +58,6 @@
     background: var(--bcw-bg);
     color: var(--bcw-ink);
     font-size: 13px;
-
-    // ---------------------------------------------------------------- tonos
-    .o_bcw_tone_group   { --tone: var(--bcw-group);      --tone-soft: var(--bcw-group-soft); }
-    .o_bcw_tone_family  { --tone: var(--bcw-family);     --tone-soft: var(--bcw-family-soft); }
-    .o_bcw_tone_classifier { --tone: var(--bcw-classifier); --tone-soft: var(--bcw-classifier-soft); }
-    .o_bcw_tone_brand   { --tone: var(--bcw-brand);      --tone-soft: var(--bcw-brand-soft); }
 
     // ---------------------------------------------------------------- encabezado
     .o_bcw_top {
@@ -203,12 +210,6 @@
     .o_bcw_summary_ok { background: #fff; border-color: #d0d5dd; }
     .o_bcw_summary_head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .o_bcw_summary_title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-ink-2); font-weight: 600; }
-
-    .o_bcw_code { display: inline-flex; flex-wrap: wrap; align-items: baseline; line-height: 1.5; font-family: var(--o-font-family-monospace, monospace); font-size: 22px; font-weight: 700; }
-    .o_bcw_code_sm { font-size: 14px; }
-    .o_bcw_code_empty { font-family: inherit; font-size: 12px; font-weight: 400; color: var(--bcw-ink-2); font-style: italic; }
-    .o_bcw_seg { color: var(--tone); }
-    .o_bcw_dash { color: var(--bcw-ink-2); padding: 0 1px; }
 
     .o_bcw_summary_rows { margin-top: 10px; display: grid; gap: 4px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .o_bcw_summary_row { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; }
@@ -386,6 +387,45 @@
     i { color: var(--bcw-accent, #0b6f6a); margin-right: .4em; }
 }
 .o_bcw_modal_sub { margin: 2px 0 0; color: var(--bcw-muted, #7b8b89); font-size: .85rem; }
+.o_bcw_modal_head_text { min-width: 0; flex: 1 1 auto; }
+.o_bcw_modal_product { font-weight: 600; overflow-wrap: anywhere; }
+.o_bcw_modal_ref { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 6px; }
+
+// ---------------------------------------------------------------- modal de edición: pantalla corrida
+// Las secciones se separan con espacio y un título pequeño, sin tarjetas ni líneas divisorias.
+.o_bcw_editor_modal .o_bcw_modal_body { background: var(--bcw-card); gap: 32px; }
+.o_bcw_editor_block { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.o_bcw_editor_heading--sub h6 { margin: 0; font-size: 13px; font-weight: 600; color: var(--bcw-ink); }
+.o_bcw_editor_heading--sub p { margin: 4px 0 0; color: var(--bcw-ink-2); font-size: 12.5px; }
+.o_bcw_name_input { min-height: 96px; line-height: 1.45; font-size: 14px; font-weight: 500; resize: vertical; }
+.o_bcw_suggestion {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 8px 12px;
+    background: var(--bcw-surface-2); border-radius: 8px; border: 1px dashed var(--bcw-rule);
+    strong { color: var(--bcw-ink); font-weight: 600; overflow-wrap: anywhere; }
+}
+.o_bcw_rows { margin-bottom: 0; th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-muted, #7b8b89); font-weight: 700; border-bottom-color: var(--bcw-rule); } td { vertical-align: middle; border-bottom-color: #f0f2f5; } }
+
+// multi-selección: chips dentro de un contenedor con aspecto de input
+.o_bcw_multi {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 38px; padding: 4px 8px;
+    border: 1px solid var(--bcw-rule); border-radius: 8px; background: var(--bcw-card);
+    &:focus-within { border-color: var(--bcw-active); box-shadow: 0 0 0 3px rgba(124, 58, 237, .12); }
+    &--readonly { background: var(--bcw-surface-2); }
+}
+.o_bcw_multi_input { flex: 1 1 120px; min-width: 120px; border: 0; outline: none; background: transparent; font-size: 13px; padding: 4px 2px; color: var(--bcw-ink); }
+.o_bcw_modal .o_bcw_chip--sm { min-height: 26px; padding: 2px 4px 2px 8px; font-size: 12.5px; }
+.o_bcw_modal .o_bcw_chip_suggested { background: var(--bcw-brand-soft); color: #1d4ed8; }
+.o_bcw_modal .o_bcw_chip_suggested .fa-magic { font-size: 11px; opacity: .8; }
+
+// datos heredados: plegados por defecto para no competir con la información vigente
+.o_bcw_legacy {
+    border-top: 1px dashed var(--bcw-rule); padding-top: 12px;
+    summary { cursor: pointer; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--bcw-muted, #7b8b89); list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: " · mostrar"; font-weight: 500; text-transform: none; letter-spacing: 0; }
+    &[open] summary::after { content: " · ocultar"; }
+    &[open] summary { margin-bottom: 16px; }
+}
 .o_bcw_modal_loading { padding: 48px; text-align: center; color: var(--bcw-muted, #7b8b89); }
 .o_bcw_modal_body { position: relative; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: var(--bcw-bg); }
 .o_bcw_editor_card {

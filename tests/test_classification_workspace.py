@@ -115,3 +115,38 @@ class TestClassificationWorkspace(TransactionCase):
             'classifier_id': session.classifier_id.id, 'brand_id': other_brand.id})
         self.assertTrue(all('WSU2' in line.reference for line in session.line_ids))
         self.assertEqual(self.products[0].default_code, 'BEFORE-000')
+
+    def test_editor_multi_country_equipment_and_brand_manufacturer_suggestion(self):
+        """El modal recibe el fabricante de la marca como sugerencia y guarda varios países y equipos."""
+        manufacturer = self.env['res.partner'].create({'name': 'Editor test manufacturer', 'is_company': True})
+        self.brand.manufacturer_id = manufacturer
+        countries = self.env['res.country'].search([], limit=2, order='id')
+        equipments = self.env['biotex.equipment'].search([], limit=2, order='id')
+        if len(equipments) < 2:
+            equipments = self.env['biotex.equipment'].create([{'name': 'Editor equipment A'}, {'name': 'Editor equipment B'}])
+        product = self.products[3]
+        product.write({'biotex_country_id': countries[0].id, 'biotex_main_equipment_id': equipments[0].id})
+        session = self.new_session()
+        session.workspace_add_products([product.id])
+        line = session.line_ids
+        self.assertEqual(line.country_ids, countries[0])
+        self.assertEqual(line.equipment_ids, equipments[0])
+        detail = session.workspace_line_detail(line.id)
+        self.assertEqual(detail['brand_manufacturer_id'], manufacturer.id)
+        self.assertEqual([c['id'] for c in detail['line']['country_ids']], [countries[0].id])
+        self.assertFalse(detail['line']['manufacturer_id'])  # la sugerencia no se guarda hasta que el usuario guarda
+        session.workspace_update_line(line.id, {
+            'new_name': 'EDITOR MULTI TEST', 'base_name': 'EDITOR MULTI TEST', 'uom_id': line.uom_id.id,
+            'country_ids': [countries[1].id, countries[0].id, countries[0].id],
+            'equipment_ids': [equipments[1].id, equipments[0].id], 'manufacturer_id': manufacturer.id,
+        })
+        self.assertEqual(line.country_ids, countries[1] | countries[0])
+        self.assertEqual(line.country_id, countries[1], 'el primero elegido es el principal')
+        self.assertEqual(line.equipment_id, equipments[1])
+        preview = session.workspace_confirmation_preview()
+        session.workspace_confirm(expected_revision=preview['revision'])
+        self.assertEqual(product.biotex_country_id, countries[1])
+        self.assertEqual(product.biotex_country_ids, countries[1] | countries[0])
+        self.assertEqual(product.biotex_main_equipment_id, equipments[1])
+        self.assertEqual(product.biotex_equipment_ids, equipments[0] | equipments[1])
+        self.assertEqual(product.biotex_manufacturer_id, manufacturer)

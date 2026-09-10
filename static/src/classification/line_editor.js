@@ -4,6 +4,9 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
 
+/** Tono de cada segmento de la referencia GG-MMMM-FFF-CCC-NN, igual que en la página 1 del asistente. */
+const REFERENCE_TONES = ["group", "brand", "family", "classifier"];
+
 class BiotexEditorDialog extends Dialog {
     static props = { ...Dialog.props, requestClose: Function };
     dismiss() { return this.props.requestClose(); }
@@ -50,10 +53,13 @@ export class BiotexLineEditorDialog extends Component {
             errors: {},
             saving: false,
             confirmClose: false,
-            detailsOpen: false,
+            detailsOpen: true,
             readingImages: 0,
             photoPreviews: {},
-            lookups: { manufacturer: [], distributor: [], equipment: [] },
+            lookups: { manufacturer: [], distributor: [], equipment: [], country: [] },
+            // etiquetas de las multi-selecciones (los ids viven en draft.country_ids / draft.equipment_ids)
+            multi: { country: [], equipment: [] },
+            manufacturerSuggested: false,
         });
         onMounted(() => this.nameInput.el?.focus());
         onWillStart(async () => {
@@ -75,9 +81,11 @@ export class BiotexLineEditorDialog extends Component {
                 model: data.line.model || "",
                 barcode: data.line.barcode || "",
                 country_id: data.line.country_id || false,
+                country_ids: (data.line.country_ids || []).map((c) => c.id),
                 manufacturer_id: data.line.manufacturer_id || false,
                 distributor_id: data.line.distributor_id || false,
                 equipment_id: data.line.equipment_id || false,
+                equipment_ids: (data.line.equipment_ids || []).map((e) => e.id),
                 specialty_id: data.line.specialty_id || false,
                 notes: data.line.notes || "",
                 base_name: data.line.base_name || data.line.new_name || "",
@@ -89,12 +97,24 @@ export class BiotexLineEditorDialog extends Component {
                 presentation_data: JSON.parse(JSON.stringify(data.line.presentation_data || [])),
                 image_changes: {},
             };
+            let manufacturerName = data.line.manufacturer_name || "";
+            // Fabricante sugerido por la marca de la clasificación: solo cuando la línea no tiene uno.
+            // Entra también en `initial` para que abrir y cerrar sin tocar nada no cuente como cambio.
+            if (!d.manufacturer_id && data.brand_manufacturer_id) {
+                d.manufacturer_id = data.brand_manufacturer_id;
+                manufacturerName = data.brand_manufacturer_name;
+                this.state.manufacturerSuggested = true;
+            }
             this.state.draft = d;
             this.state.initial = JSON.parse(JSON.stringify(d));
             this.state.labels = {
-                manufacturer: data.line.manufacturer_name || "",
+                manufacturer: manufacturerName,
                 distributor: data.line.distributor_name || "",
                 equipment: data.line.equipment_name || "",
+            };
+            this.state.multi = {
+                country: [...(data.line.country_ids || [])],
+                equipment: [...(data.line.equipment_ids || [])],
             };
             this.state.loading = false;
         });
@@ -152,11 +172,44 @@ export class BiotexLineEditorDialog extends Component {
     get consecutiveLabel() {
         return this.state.line.consecutive_label || "";
     }
+    /** Nombre actual completo del producto, tal como se agregó a la sesión. */
+    get productTitle() {
+        return this.state.line.old_name || this.state.line.new_name || "";
+    }
+    /**
+     * Referencia final con los mismos tonos que la página 1: grupo, marca, familia, clasificador
+     * (formato GG-MMMM-FFF-CCC) y el consecutivo al final.
+     */
+    get referenceSegments() {
+        const code = this.state.line.reference || this.props.classCode || "";
+        if (!code) return [];
+        return code.split("-").map((text, i) => ({ text, tone: REFERENCE_TONES[i] || "consecutive" }));
+    }
+    /** Descripción armada con medidas y complemento; se ofrece como sugerencia, no sustituye lo escrito. */
+    get suggestedName() {
+        const d = this.state.draft;
+        const measures = d.measure_data.length
+            ? d.measure_data.map((r) => [r.component, r.measure_type, r.value, r.unit].filter((x) => x !== "").join(" ")).join("; ")
+            : d.measure;
+        if (!measures && !d.description_extra) return "";
+        return [d.base_name || d.new_name, measures, d.description_extra].filter(Boolean).join(" ").toUpperCase();
+    }
+    get showSuggestion() {
+        const suggested = this.suggestedName;
+        return !!suggested && suggested !== (this.state.draft.new_name || "").toUpperCase();
+    }
+    useSuggestedName() {
+        this.state.draft.new_name = this.suggestedName;
+        delete this.state.errors.new_name;
+    }
     // ------------------------------------------------------------------ entrada
     onInput(field, ev) {
         this.state.draft[field] = field === "barcode" || field === "manufacturer_ref" ? ev.target.value : ev.target.value.toUpperCase();
         ev.target.value = this.state.draft[field];
-        if (["base_name", "description_extra", "measure"].includes(field)) this.refreshDescription();
+        // Sin medidas ni complemento, el nombre escrito es también la descripción base del producto.
+        if (field === "new_name" && !this.state.draft.measure_data.length && !this.state.draft.description_extra) {
+            this.state.draft.base_name = this.state.draft.new_name;
+        }
         delete this.state.errors[field];
     }
     onNumber(field, ev) {
@@ -170,8 +223,16 @@ export class BiotexLineEditorDialog extends Component {
     async onLookup(kind, ev) {
         const query = ev.target.value;
         this.state.labels[kind + "Query"] = query;
+        if (kind === "manufacturer") this.state.manufacturerSuggested = false;
         if (query.length < 2) {
             this.state.lookups[kind] = [];
+            return;
+        }
+        if (kind === "country") {
+            const q = query.toLowerCase();
+            const chosen = new Set(this.state.draft.country_ids);
+            this.state.lookups.country = this.state.catalogs.countries
+                .filter((c) => !chosen.has(c.id) && c.name.toLowerCase().includes(q)).slice(0, 8);
             return;
         }
         const model = kind === "equipment" ? "biotex.equipment" : "res.partner";
@@ -179,34 +240,45 @@ export class BiotexLineEditorDialog extends Component {
         this.state.lookups[kind] = await this.orm.call(
             "biotex.classification.session", "workspace_search_relation", [model, query], { context: ctx });
     }
-    pick(kind, record) {
-        const field = { manufacturer: "manufacturer_id", distributor: "distributor_id", equipment: "equipment_id" }[kind];
+    pick(kind, record, ev) {
+        this.state.lookups[kind] = [];
+        this.state.labels[kind + "Query"] = "";
+        if (kind === "country" || kind === "equipment") {
+            // multi-selección: el primero elegido es el principal
+            const field = kind + "_ids";
+            if (!this.state.draft[field].includes(record.id)) {
+                this.state.draft[field].push(record.id);
+                this.state.multi[kind].push({ id: record.id, name: record.name });
+            }
+            const input = ev?.target.closest(".o_bcw_field")?.querySelector("input");
+            if (input) { input.value = ""; input.focus(); }
+            return;
+        }
+        const field = { manufacturer: "manufacturer_id", distributor: "distributor_id" }[kind];
         this.state.draft[field] = record.id;
         this.state.labels[kind] = record.name;
-        this.state.lookups[kind] = [];
+        if (kind === "manufacturer") this.state.manufacturerSuggested = false;
     }
     clearLookup(kind) {
-        const field = { manufacturer: "manufacturer_id", distributor: "distributor_id", equipment: "equipment_id" }[kind];
+        const field = { manufacturer: "manufacturer_id", distributor: "distributor_id" }[kind];
         this.state.draft[field] = false;
         this.state.labels[kind] = "";
+        if (kind === "manufacturer") this.state.manufacturerSuggested = false;
     }
-
-    refreshDescription() {
-        const d = this.state.draft;
-        const measures = d.measure_data.length ? d.measure_data.map((r) => [r.component, r.measure_type, r.value, r.unit].filter((x) => x !== "").join(" ")).join("; ") : d.measure;
-        d.new_name = [d.base_name, measures, d.description_extra].filter(Boolean).join(" ").toUpperCase();
+    removeMulti(kind, id) {
+        const field = kind + "_ids";
+        this.state.draft[field] = this.state.draft[field].filter((x) => x !== id);
+        this.state.multi[kind] = this.state.multi[kind].filter((x) => x.id !== id);
     }
     addRow(kind) {
         this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { name: "", quantity: 1, barcode: "" });
     }
     removeRow(kind, index) {
         this.state.draft[kind].splice(index, 1);
-        if (kind === "measure_data") this.refreshDescription();
     }
     onRow(kind, index, field, ev) {
         const raw = ev.target.value;
         this.state.draft[kind][index][field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
-        if (kind === "measure_data") this.refreshDescription();
     }
     async createRelation(kind) {
         const name = (this.state.labels[kind + "Query"] || "").trim();
@@ -222,7 +294,7 @@ export class BiotexLineEditorDialog extends Component {
     // ------------------------------------------------------------------ validación
     validate() {
         const errors = {};
-        if (!(this.state.draft.base_name || "").trim()) errors.new_name = _t("Indica la descripción base del producto.");
+        if (!(this.state.draft.new_name || "").trim()) errors.new_name = _t("Indica el nuevo nombre del producto.");
         if (!this.state.draft.uom_id) errors.uom_id = _t("Selecciona la unidad de medida.");
         const qty = this.state.draft.package_qty;
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
@@ -241,6 +313,7 @@ export class BiotexLineEditorDialog extends Component {
         try {
             const vals = { ...this.state.draft };
             vals.package_qty = vals.package_qty === "" ? 1 : vals.package_qty;
+            if (!(vals.base_name || "").trim()) vals.base_name = vals.new_name;
             const session = await this.orm.call("biotex.classification.session", "workspace_update_line", [
                 [this.props.sessionId], this.props.lineId, vals,
             ]);

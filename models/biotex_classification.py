@@ -318,9 +318,11 @@ class BiotexClassificationSession(models.Model):
                 'model': product.biotex_model,
                 'barcode': product.barcode,
                 'country_id': product.biotex_country_id.id,
+                'country_ids': [(6, 0, (product.biotex_country_id | product.biotex_country_ids).ids)],
                 'manufacturer_id': product.biotex_manufacturer_id.id,
                 'distributor_id': product.biotex_primary_distributor_id.id,
                 'equipment_id': product.biotex_main_equipment_id.id,
+                'equipment_ids': [(6, 0, (product.biotex_main_equipment_id | product.biotex_equipment_ids).ids)],
                 'specialty_id': product.biotex_main_specialty_id.id,
                 'notes': product.biotex_characteristics,
                 'base_name': product.biotex_name or product.name,
@@ -387,6 +389,12 @@ class BiotexClassificationSession(models.Model):
             clean['manufacturer_ref'] = (clean['manufacturer_ref'] or '').strip()
         if 'measure_data' in clean:
             clean['measure_data'] = clean_measures(clean['measure_data'])
+        for many, single in (('country_ids', 'country_id'), ('equipment_ids', 'equipment_id')):
+            if many in clean:
+                ids = [int(i) for i in (clean[many] or []) if i]
+                ids = list(dict.fromkeys(ids))  # sin repetidos, conservando el orden elegido
+                clean[many] = [(6, 0, ids)]
+                clean[single] = ids[0] if ids else False  # el primero es el principal
         line.write(clean)
         return self._workspace_session()
 
@@ -409,6 +417,10 @@ class BiotexClassificationSession(models.Model):
             },
             'classification_brand_id': self.brand_id.id or False,
             'classification_brand_name': self.brand_id.display_name or '',
+            # Fabricante sugerido: el registrado en la marca de la clasificación. El modal lo precarga
+            # cuando la línea aún no tiene fabricante y el usuario puede cambiarlo.
+            'brand_manufacturer_id': self.brand_id.manufacturer_id.id or False,
+            'brand_manufacturer_name': self.brand_id.manufacturer_id.display_name or '',
         }
 
     @api.model
@@ -506,10 +518,14 @@ class BiotexClassificationSessionLine(models.Model):
     manufacturer_ref = fields.Char(string='Referencia del fabricante')
     model = fields.Char(string='Modelo')
     barcode = fields.Char(string='Código de barras')
-    country_id = fields.Many2one('res.country', string='País de origen')
+    country_id = fields.Many2one('res.country', string='País de origen principal')
+    country_ids = fields.Many2many('res.country', 'biotex_classification_line_country_rel', 'line_id', 'country_id',
+                                   string='Países de origen')
     manufacturer_id = fields.Many2one('res.partner', string='Fabricante')
     distributor_id = fields.Many2one('res.partner', string='Distribuidor primario')
-    equipment_id = fields.Many2one('biotex.equipment', string='Equipo relacionado')
+    equipment_id = fields.Many2one('biotex.equipment', string='Equipo principal')
+    equipment_ids = fields.Many2many('biotex.equipment', 'biotex_classification_line_equipment_rel', 'line_id', 'equipment_id',
+                                     string='Equipos relacionados')
     specialty_id = fields.Many2one('biotex.specialty', string='Especialidad')
     notes = fields.Text(string='Notas')
 
@@ -522,7 +538,7 @@ class BiotexClassificationSessionLine(models.Model):
     presentation_data = fields.Json(string='Presentaciones y códigos', default=list)
 
     DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'manufacturer_ref', 'model',
-                     'barcode', 'country_id', 'manufacturer_id', 'distributor_id', 'equipment_id', 'specialty_id', 'notes',
+                     'barcode', 'country_id', 'country_ids', 'manufacturer_id', 'distributor_id', 'equipment_id', 'equipment_ids', 'specialty_id', 'notes',
                      'base_name','description_extra','usage_notes','internal_notes','compatibility_notes','measure_data','presentation_data')
     AUDIT_FIELDS = ('applied_reference_before', 'applied_reference_after', 'applied_classification_before',
                    'applied_classification_after', 'applied_by_id', 'applied_on')
@@ -628,6 +644,8 @@ class BiotexClassificationSessionLine(models.Model):
             'distributor_name': self.distributor_id.display_name or '',
             'equipment_id': self.equipment_id.id or False,
             'equipment_name': self.equipment_id.display_name or '',
+            'equipment_ids': [{'id': e.id, 'name': e.display_name} for e in self.equipment_ids],
+            'country_ids': [{'id': c.id, 'name': c.name} for c in self.country_ids],
             'specialty_id': self.specialty_id.id or False,
             'notes': self.notes or '',
         })
@@ -671,9 +689,12 @@ class BiotexClassificationSessionLine(models.Model):
             vals['barcode'] = self.barcode
         elif not product.barcode and not product.biotex_reference and not self.manufacturer_ref:
             vals['barcode'] = self.reference
-        if self.equipment_id:
-            vals['biotex_main_equipment_id'] = self.equipment_id.id
-            vals['biotex_equipment_ids'] = [(4, self.equipment_id.id)]
+        if self.country_ids:
+            vals['biotex_country_ids'] = [(6, 0, self.country_ids.ids)]
+        if self.equipment_ids or self.equipment_id:
+            equipments = self.equipment_id | self.equipment_ids
+            vals['biotex_main_equipment_id'] = (self.equipment_id or equipments[:1]).id
+            vals['biotex_equipment_ids'] = [(4, e.id) for e in equipments]
         if self.specialty_id:
             vals['biotex_main_specialty_id'] = self.specialty_id.id
             vals['biotex_specialty_ids'] = [(4, self.specialty_id.id)]

@@ -40,6 +40,8 @@ class ProductTemplate(models.Model):
     biotex_model = fields.Char(string='Modelo')
     biotex_manufacturer_id = fields.Many2one('res.partner', string='Fabricante')
     biotex_country_id = fields.Many2one('res.country', string='País de origen')
+    biotex_country_ids = fields.Many2many('res.country', 'biotex_product_country_rel', 'product_tmpl_id', 'country_id',
+                                          string='Países de origen', help='Todos los países de origen; el primero es el país principal.')
     biotex_primary_distributor_id = fields.Many2one('res.partner', string='Distribuidor primario', domain=[('supplier_rank', '>', 0)])
     biotex_alt_code = fields.Char(string='Clave alterna', help='Clave del cliente, SAI o del proveedor.')
     biotex_legacy_code = fields.Char(string='Clave anterior (SICAR)')
