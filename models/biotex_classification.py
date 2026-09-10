@@ -205,8 +205,13 @@ class BiotexClassificationSession(models.Model):
         if vals.get('state') == 'confirmed':
             raise UserError('Use Generar claves para confirmar la sesión.')
         previous = {session.id: session.class_code for session in self}
+        brands = {session.id: session.brand_id for session in self}
         result = super().write(vals)
         for session in self:
+            if session.brand_id != brands[session.id] and session.brand_id.manufacturer_id:
+                # la sugerencia solo llena fabricantes vacíos que el usuario no haya tocado
+                pending = session.line_ids.filtered(lambda l: not l.manufacturer_id and not l.manufacturer_manual)
+                super(BiotexClassificationSessionLine, pending).write({'manufacturer_id': session.brand_id.manufacturer_id.id})
             if session.class_code != previous[session.id] and session.line_ids:
                 if session.class_code:
                     session._reassign_consecutives()
@@ -359,11 +364,14 @@ class BiotexClassificationSession(models.Model):
                 'barcode': product.barcode,
                 'country_id': product.biotex_country_id.id,
                 'country_ids': [(6, 0, (product.biotex_country_id | product.biotex_country_ids).ids)],
-                'manufacturer_id': product.biotex_manufacturer_id.id,
+                # sin fabricante en la ficha se toma el de la marca de la clasificación (si ya está fijada)
+                'manufacturer_id': (product.biotex_manufacturer_id or self.brand_id.manufacturer_id).id,
+                'manufacturer_manual': bool(product.biotex_manufacturer_id),
                 'distributor_id': product.biotex_primary_distributor_id.id,
                 'equipment_id': product.biotex_main_equipment_id.id,
                 'equipment_ids': [(6, 0, (product.biotex_main_equipment_id | product.biotex_equipment_ids).ids)],
                 'specialty_id': product.biotex_main_specialty_id.id,
+                'specialty_ids': [(6, 0, (product.biotex_main_specialty_id | product.biotex_specialty_ids).ids)],
                 'notes': product.biotex_characteristics,
                 'base_name': product.biotex_name or product.name,
                 'description_extra': product.biotex_description_extra,
@@ -452,7 +460,12 @@ class BiotexClassificationSession(models.Model):
             clean['manufacturer_ref'] = (clean['manufacturer_ref'] or '').strip()
         if 'measure_data' in clean:
             clean['measure_data'] = clean_measures(clean['measure_data'])
-        for many, single in (('country_ids', 'country_id'), ('equipment_ids', 'equipment_id')):
+        if 'manufacturer_id' in clean:
+            # Un valor elegido o vaciado por el usuario deja de recibir la sugerencia de la marca.
+            suggested = self.brand_id.manufacturer_id.id or False
+            if (clean['manufacturer_id'] or False) != suggested or line.manufacturer_manual:
+                clean['manufacturer_manual'] = True
+        for many, single in (('country_ids', 'country_id'), ('equipment_ids', 'equipment_id'), ('specialty_ids', 'specialty_id')):
             if many in clean:
                 ids = [int(i) for i in (clean[many] or []) if i]
                 ids = list(dict.fromkeys(ids))  # sin repetidos, conservando el orden elegido
@@ -592,7 +605,12 @@ class BiotexClassificationSessionLine(models.Model):
     equipment_id = fields.Many2one('biotex.equipment', string='Equipo principal')
     equipment_ids = fields.Many2many('biotex.equipment', 'biotex_classification_line_equipment_rel', 'line_id', 'equipment_id',
                                      string='Equipos relacionados')
-    specialty_id = fields.Many2one('biotex.specialty', string='Especialidad')
+    specialty_id = fields.Many2one('biotex.specialty', string='Especialidad principal')
+    specialty_ids = fields.Many2many('biotex.specialty', 'biotex_classification_line_specialty_rel', 'line_id', 'specialty_id',
+                                     string='Especialidades')
+    manufacturer_manual = fields.Boolean(
+        string='Fabricante capturado a mano', copy=False,
+        help='El usuario eligió (o vació) el fabricante; la sugerencia del catálogo de marcas ya no lo sobrescribe.')
     notes = fields.Text(string='Notas')
 
     base_name = fields.Char(string='Descripción base')
@@ -604,7 +622,7 @@ class BiotexClassificationSessionLine(models.Model):
     presentation_data = fields.Json(string='Presentaciones y códigos', default=list)
 
     DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'manufacturer_ref', 'model',
-                     'barcode', 'country_id', 'country_ids', 'manufacturer_id', 'distributor_id', 'equipment_id', 'equipment_ids', 'specialty_id', 'notes',
+                     'barcode', 'country_id', 'country_ids', 'manufacturer_id', 'manufacturer_manual', 'distributor_id', 'equipment_id', 'equipment_ids', 'specialty_id', 'specialty_ids', 'notes',
                      'base_name','description_extra','usage_notes','internal_notes','compatibility_notes','measure_data','presentation_data')
     AUDIT_FIELDS = ('applied_reference_before', 'applied_reference_after', 'applied_classification_before',
                    'applied_classification_after', 'applied_by_id', 'applied_on')
@@ -741,6 +759,8 @@ class BiotexClassificationSessionLine(models.Model):
             'equipment_id': self.equipment_id.id or False,
             'equipment_name': self.equipment_id.display_name or '',
             'equipment_ids': [{'id': e.id, 'name': e.display_name} for e in self.equipment_ids],
+            'specialty_ids': [{'id': sp.id, 'name': sp.name} for sp in self.specialty_ids],
+            'manufacturer_manual': self.manufacturer_manual,
             'country_ids': [{'id': c.id, 'name': c.name} for c in self.country_ids],
             'specialty_id': self.specialty_id.id or False,
             'notes': self.notes or '',
@@ -791,9 +811,10 @@ class BiotexClassificationSessionLine(models.Model):
             equipments = self.equipment_id | self.equipment_ids
             vals['biotex_main_equipment_id'] = (self.equipment_id or equipments[:1]).id
             vals['biotex_equipment_ids'] = [(4, e.id) for e in equipments]
-        if self.specialty_id:
-            vals['biotex_main_specialty_id'] = self.specialty_id.id
-            vals['biotex_specialty_ids'] = [(4, self.specialty_id.id)]
+        if self.specialty_ids or self.specialty_id:
+            specialties = self.specialty_id | self.specialty_ids
+            vals['biotex_main_specialty_id'] = (self.specialty_id or specialties[:1]).id
+            vals['biotex_specialty_ids'] = [(4, sp.id) for sp in specialties]
         product.write(vals)
         if self.presentation_data is not None and self.presentation_data is not False:
             product._biotex_set_presentations(self.presentation_data)

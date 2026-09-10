@@ -150,3 +150,41 @@ class TestClassificationWorkspace(TransactionCase):
         self.assertEqual(product.biotex_main_equipment_id, equipments[1])
         self.assertEqual(product.biotex_equipment_ids, equipments[0] | equipments[1])
         self.assertEqual(product.biotex_manufacturer_id, manufacturer)
+
+    def test_specialties_multi_and_manufacturer_suggestion_never_overrides_manual_value(self):
+        suggested = self.env['res.partner'].create({'name': 'Brand suggested manufacturer', 'is_company': True})
+        chosen = self.env['res.partner'].create({'name': 'Manually chosen manufacturer', 'is_company': True})
+        self.brand.manufacturer_id = suggested
+        specialties = self.env['biotex.specialty'].search([], limit=2, order='id')
+        if len(specialties) < 2:
+            specialties = self.env['biotex.specialty'].create([{'name': 'Flow specialty A', 'code': 'FSA'}, {'name': 'Flow specialty B', 'code': 'FSB'}])
+        product = self.products[4]
+        session = self.new_session()
+        session.workspace_add_products([product.id])
+        line = session.line_ids
+        self.assertEqual(line.manufacturer_id, suggested, 'sin fabricante en la ficha se toma el de la marca')
+        self.assertFalse(line.manufacturer_manual)
+        # el usuario elige otro: queda marcado como capturado a mano
+        session.workspace_update_line(line.id, {'new_name': line.new_name, 'uom_id': line.uom_id.id, 'manufacturer_id': chosen.id,
+                                                'specialty_ids': [specialties[1].id, specialties[0].id]})
+        self.assertTrue(line.manufacturer_manual)
+        self.assertEqual(line.specialty_ids, specialties[1] | specialties[0])
+        self.assertEqual(line.specialty_id, specialties[1], 'la primera elegida es la principal')
+        # el usuario lo vacía: tampoco se vuelve a sugerir, ni al recalcular por cambio de marca
+        session.workspace_update_line(line.id, {'new_name': line.new_name, 'uom_id': line.uom_id.id, 'manufacturer_id': False})
+        self.assertFalse(line.manufacturer_id)
+        self.assertTrue(line.manufacturer_manual)
+        other_brand = self.env['biotex.brand'].create({'name': 'Suggesting brand', 'code': 'WSU3', 'manufacturer_id': suggested.id})
+        session.write({'brand_id': other_brand.id})
+        self.assertFalse(line.manufacturer_id, 'un valor vaciado a mano no se rellena')
+        detail = session.workspace_line_detail(line.id)['line']
+        self.assertTrue(detail['manufacturer_manual'])
+        # una línea nunca tocada sí recibe la sugerencia al fijar la marca
+        untouched = self.products[5]
+        session.workspace_add_products([untouched.id])
+        self.assertEqual(session.line_ids.filtered(lambda l: l.product_id == untouched).manufacturer_id, suggested)
+        preview = session.workspace_confirmation_preview()
+        session.workspace_confirm(expected_revision=preview['revision'])
+        self.assertEqual(product.biotex_main_specialty_id, specialties[1])
+        self.assertEqual(product.biotex_specialty_ids, specialties[0] | specialties[1])
+        self.assertFalse(product.biotex_manufacturer_id)

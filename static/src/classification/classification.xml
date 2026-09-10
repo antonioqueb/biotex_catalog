@@ -385,7 +385,6 @@
             <section class="o_bcw_editor_block" aria-label="Datos principales">
                 <div class="o_bcw_editor_heading">
                     <h5>Datos principales</h5>
-                    <p>Revisa el nombre y la unidad de medida. Los campos con * son obligatorios.</p>
                 </div>
                 <div class="o_bcw_field">
                     <label class="o_bcw_label" for="bcw_editor_name">Nuevo Nombre <span class="o_bcw_req">*</span></label>
@@ -417,19 +416,16 @@
 
             <!-- ============================================== empacados y códigos -->
             <section class="o_bcw_editor_block" aria-label="Empacados de productos y códigos de barras">
-                <div class="o_bcw_editor_heading"><h5>Empacados de productos y códigos de barras</h5><p>Cada empacado conserva la clave del producto. Indica cuántas unidades indivisibles contiene cada código.</p></div>
-                <div class="o_bcw_grid o_bcw_grid--2">
-                    <div class="o_bcw_field">
-                        <label class="o_bcw_label">Código de barras de la unidad</label>
-                        <input type="text" class="o_bcw_input o_bcw_mono" placeholder="7701234567890"
-                               t-att-value="state.draft.barcode" t-att-readonly="props.readonly"
-                               t-on-input="(ev) => this.onInput('barcode', ev)"/>
-                    </div>
-                </div>
-                <div class="table-responsive"><table class="table table-sm o_bcw_rows"><thead><tr><th>Empacado</th><th>Unidades indivisibles</th><th>Código de barras</th><th/></tr></thead><tbody>
+                <div class="o_bcw_editor_heading"><h5>Empacados de productos y códigos de barras</h5><p>Cada empacado conserva la clave del producto y se cuenta en la unidad indivisible de arriba. Captura la descripción y su código de barras.</p></div>
+                <div class="table-responsive"><table class="table table-sm o_bcw_rows"><thead><tr><th>Empacado</th><th>Unidades indivisibles<t t-if="baseUomName"> (<t t-esc="baseUomName"/>)</t></th><th>Código de barras</th><th/></tr></thead><tbody>
                     <tr t-foreach="state.draft.presentation_data" t-as="row" t-key="row_index">
-                        <td><input aria-label="Empacado" class="o_bcw_input" placeholder="CAJA CON 50" t-att-value="row.name" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'name', ev)"/></td>
-                        <td><input aria-label="Unidades por empacado" class="o_bcw_input" type="number" min="1" step="1" t-att-value="row.quantity" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'quantity', ev)"/></td>
+                        <td><input aria-label="Empacado" class="o_bcw_input" placeholder="CAJA CON 12" t-att-value="row.name" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'name', ev)"/></td>
+                        <td>
+                            <div class="o_bcw_qty_unit">
+                                <input aria-label="Unidades indivisibles por empacado" class="o_bcw_input" type="number" min="1" step="1" t-att-value="row.quantity" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'quantity', ev)"/>
+                                <span class="o_bcw_qty_unit_label" t-att-title="'Unidad indivisible: ' + (baseUomName || '—')" t-esc="baseUomName || '—'"/>
+                            </div>
+                        </td>
                         <td><input aria-label="Código del empacado" class="o_bcw_input o_bcw_mono" t-att-value="row.barcode" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'barcode', ev)"/></td>
                         <td><button t-if="!props.readonly" class="btn btn-link" aria-label="Quitar empacado" t-on-click="() => this.removeRow('presentation_data', row_index)"><i class="fa fa-trash"/></button></td>
                     </tr>
@@ -456,15 +452,10 @@
                 </div>
                 <button t-if="!props.readonly" class="btn btn-outline-secondary btn-sm align-self-start" t-on-click="() => this.addRow('measure_data')"><i class="fa fa-plus me-1"/>Agregar medida</button>
                 <p t-if="state.errors.measure_data" class="o_bcw_error" t-esc="state.errors.measure_data"/>
-                <div class="o_bcw_field"><label class="o_bcw_label">Complemento de descripción</label><input class="o_bcw_input" placeholder="Texto que se agrega a la descripción sugerida" t-att-value="state.draft.description_extra" t-att-readonly="props.readonly" t-on-input="(ev) => this.onInput('description_extra', ev)"/></div>
             </section>
 
             <!-- ============================================== información adicional -->
             <section class="o_bcw_editor_block" aria-label="Información adicional">
-                <div class="o_bcw_editor_heading">
-                    <h5>Información adicional</h5>
-                    <p>Imágenes, fabricante, referencias y uso del producto.</p>
-                </div>
                 <div id="bcw_editor_details" class="o_bcw_details_body">
 
                     <section class="o_bcw_editor_photos" aria-label="Imágenes del producto">
@@ -579,12 +570,21 @@
                             <small class="o_bcw_help">El primero es el equipo principal.</small>
                         </div>
                         <div class="o_bcw_field">
-                            <label class="o_bcw_label">Especialidad</label>
-                            <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('specialty_id', ev)">
-                                <option value="" t-att-selected="!state.draft.specialty_id">—</option>
-                                <option t-foreach="state.catalogs.specialties" t-as="sp" t-key="sp.id" t-att-value="sp.id"
-                                        t-att-selected="sp.id === state.draft.specialty_id" t-esc="sp.name"/>
-                            </select>
+                            <label class="o_bcw_label" for="bcw_editor_specialty">Especialidad</label>
+                            <div class="o_bcw_multi" t-att-class="{ 'o_bcw_multi--readonly': props.readonly }">
+                                <span t-foreach="state.multi.specialty" t-as="sp" t-key="sp.id" class="o_bcw_chip o_bcw_chip--sm">
+                                    <span t-esc="sp.name"/>
+                                    <button t-if="!props.readonly" class="o_bcw_chip_x" t-att-aria-label="'Quitar ' + sp.name" t-on-click="() => this.removeMulti('specialty', sp.id)"><i class="fa fa-times"/></button>
+                                </span>
+                                <input t-if="!props.readonly" id="bcw_editor_specialty" type="text" class="o_bcw_multi_input" autocomplete="off"
+                                       t-att-placeholder="state.multi.specialty.length ? 'Agregar otra especialidad...' : 'Buscar especialidad...'"
+                                       t-on-input="(ev) => this.onLookup('specialty', ev)"/>
+                            </div>
+                            <div class="o_bcw_lookup" t-if="state.lookups.specialty.length">
+                                <button t-foreach="state.lookups.specialty" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
+                                        t-on-click="(ev) => this.pick('specialty', r, ev)" t-esc="r.name"/>
+                            </div>
+                            <small class="o_bcw_help">Puedes indicar varias; la primera es la principal.</small>
                         </div>
                     </div>
 
@@ -593,10 +593,6 @@
                         <textarea class="o_bcw_input o_bcw_textarea" rows="3" placeholder="Electrodo estéril desechable diseñado para estudios de electromiografía."
                                   t-att-readonly="props.readonly" t-on-input="(ev) => this.onInput('notes', ev)"
                                   t-esc="state.draft.notes"/>
-                    </div>
-                    <div class="o_bcw_field">
-                        <label class="o_bcw_label">Notas de uso</label>
-                        <textarea class="o_bcw_input o_bcw_textarea" rows="2" t-att-readonly="props.readonly" t-on-input="(ev) => this.onInput('usage_notes', ev)" t-esc="state.draft.usage_notes"/>
                     </div>
                     <div class="o_bcw_field">
                         <label class="o_bcw_label">Compatibilidad</label>

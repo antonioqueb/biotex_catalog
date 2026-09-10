@@ -412,6 +412,15 @@
 }
 .o_bcw_rows { margin-bottom: 0; th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--bcw-muted, #7b8b89); font-weight: 700; border-bottom-color: var(--bcw-rule); } td { vertical-align: middle; border-bottom-color: #f0f2f5; } }
 
+// empacados: cantidad seguida de la unidad indivisible base (solo lectura)
+.o_bcw_qty_unit { display: flex; align-items: stretch; min-width: 0; }
+.o_bcw_qty_unit .o_bcw_input { border-top-right-radius: 0; border-bottom-right-radius: 0; min-width: 72px; flex: 0 1 96px; }
+.o_bcw_qty_unit_label {
+    display: inline-flex; align-items: center; padding: 0 10px; font-size: 12.5px; white-space: nowrap;
+    color: var(--bcw-ink-2); background: var(--bcw-surface-2); border: 1px solid var(--bcw-rule); border-left: 0;
+    border-radius: 0 8px 8px 0;
+}
+
 // multi-selección: chips dentro de un contenedor con aspecto de input
 .o_bcw_multi {
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 38px; padding: 4px 8px;

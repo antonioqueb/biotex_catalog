@@ -54,9 +54,9 @@ export class BiotexLineEditorDialog extends Component {
             detailsOpen: true,
             readingImages: 0,
             photoPreviews: {},
-            lookups: { manufacturer: [], distributor: [], equipment: [], country: [] },
-            // etiquetas de las multi-selecciones (los ids viven en draft.country_ids / draft.equipment_ids)
-            multi: { country: [], equipment: [] },
+            lookups: { manufacturer: [], distributor: [], equipment: [], country: [], specialty: [] },
+            // etiquetas de las multi-selecciones (los ids viven en draft.<kind>_ids)
+            multi: { country: [], equipment: [], specialty: [] },
             manufacturerSuggested: false,
         });
         onMounted(() => this.nameInput.el?.focus());
@@ -85,6 +85,7 @@ export class BiotexLineEditorDialog extends Component {
                 equipment_id: data.line.equipment_id || false,
                 equipment_ids: (data.line.equipment_ids || []).map((e) => e.id),
                 specialty_id: data.line.specialty_id || false,
+                specialty_ids: (data.line.specialty_ids || []).map((sp) => sp.id),
                 notes: data.line.notes || "",
                 base_name: data.line.base_name || data.line.new_name || "",
                 description_extra: data.line.description_extra || "",
@@ -96,13 +97,15 @@ export class BiotexLineEditorDialog extends Component {
                 image_changes: {},
             };
             let manufacturerName = data.line.manufacturer_name || "";
-            // Fabricante sugerido por la marca de la clasificación: solo cuando la línea no tiene uno.
-            // Entra también en `initial` para que abrir y cerrar sin tocar nada no cuente como cambio.
-            if (!d.manufacturer_id && data.brand_manufacturer_id) {
+            // Fabricante sugerido por la marca de la clasificación: solo si el campo está vacío y el usuario
+            // nunca lo capturó ni lo vació a mano (`manufacturer_manual`). Entra también en `initial` para que
+            // abrir y cerrar sin tocar nada no cuente como cambio.
+            if (!d.manufacturer_id && !data.line.manufacturer_manual && data.brand_manufacturer_id) {
                 d.manufacturer_id = data.brand_manufacturer_id;
                 manufacturerName = data.brand_manufacturer_name;
-                this.state.manufacturerSuggested = true;
             }
+            this.state.manufacturerSuggested = !!d.manufacturer_id && !data.line.manufacturer_manual
+                && d.manufacturer_id === data.brand_manufacturer_id;
             this.state.draft = d;
             this.state.initial = JSON.parse(JSON.stringify(d));
             this.state.labels = {
@@ -113,6 +116,7 @@ export class BiotexLineEditorDialog extends Component {
             this.state.multi = {
                 country: [...(data.line.country_ids || [])],
                 equipment: [...(data.line.equipment_ids || [])],
+                specialty: [...(data.line.specialty_ids || [])],
             };
             this.state.loading = false;
         });
@@ -179,6 +183,10 @@ export class BiotexLineEditorDialog extends Component {
         const code = this.state.line.reference || this.props.classCode || "";
         return code ? referenceTones(code) : [];
     }
+    /** Nombre de la unidad indivisible elegida arriba; es la unidad en que se cuentan los empacados. */
+    get baseUomName() {
+        return this.state.catalogs.uoms.find((u) => u.id === this.state.draft.uom_id)?.name || "";
+    }
     /** Producto ya clasificado con esta misma clave: el nombre y la referencia no se tocan. */
     get nameLocked() {
         return !!this.state.line.preserve_reference;
@@ -227,11 +235,12 @@ export class BiotexLineEditorDialog extends Component {
             this.state.lookups[kind] = [];
             return;
         }
-        if (kind === "country") {
+        if (kind === "country" || kind === "specialty") {
+            // catálogos ya cargados: se filtran en el cliente
             const q = query.toLowerCase();
-            const chosen = new Set(this.state.draft.country_ids);
-            this.state.lookups.country = this.state.catalogs.countries
-                .filter((c) => !chosen.has(c.id) && c.name.toLowerCase().includes(q)).slice(0, 8);
+            const chosen = new Set(this.state.draft[kind + "_ids"]);
+            const source = kind === "country" ? this.state.catalogs.countries : this.state.catalogs.specialties;
+            this.state.lookups[kind] = source.filter((c) => !chosen.has(c.id) && c.name.toLowerCase().includes(q)).slice(0, 8);
             return;
         }
         const model = kind === "equipment" ? "biotex.equipment" : "res.partner";
@@ -242,7 +251,7 @@ export class BiotexLineEditorDialog extends Component {
     pick(kind, record, ev) {
         this.state.lookups[kind] = [];
         this.state.labels[kind + "Query"] = "";
-        if (kind === "country" || kind === "equipment") {
+        if (kind === "country" || kind === "equipment" || kind === "specialty") {
             // multi-selección: el primero elegido es el principal
             const field = kind + "_ids";
             if (!this.state.draft[field].includes(record.id)) {
@@ -270,14 +279,27 @@ export class BiotexLineEditorDialog extends Component {
         this.state.multi[kind] = this.state.multi[kind].filter((x) => x.id !== id);
     }
     addRow(kind) {
-        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { name: "", quantity: 1, barcode: "" });
+        // Un empacado nuevo cuenta en la unidad indivisible base; la cantidad se deduce de la descripción
+        // ("CAJA CON 12" → 12) mientras el usuario no la escriba a mano (`_auto`).
+        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { name: "", quantity: 1, barcode: "", _auto: true });
+    }
+    /** Primer entero de la descripción del empacado, o 1 si no trae número. */
+    static quantityFromName(name) {
+        const match = /\d+/.exec(name || "");
+        const value = match ? parseInt(match[0], 10) : 0;
+        return value >= 1 ? value : 1;
     }
     removeRow(kind, index) {
         this.state.draft[kind].splice(index, 1);
     }
     onRow(kind, index, field, ev) {
         const raw = ev.target.value;
-        this.state.draft[kind][index][field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
+        const row = this.state.draft[kind][index];
+        row[field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
+        if (kind === "presentation_data") {
+            if (field === "quantity") row._auto = false;
+            if (field === "name" && row._auto) row.quantity = BiotexLineEditorDialog.quantityFromName(row.name);
+        }
     }
     async createRelation(kind) {
         const name = (this.state.labels[kind + "Query"] || "").trim();
@@ -312,6 +334,7 @@ export class BiotexLineEditorDialog extends Component {
         try {
             const vals = { ...this.state.draft };
             vals.package_qty = vals.package_qty === "" ? 1 : vals.package_qty;
+            vals.presentation_data = vals.presentation_data.map(({ _auto, ...row }) => row);
             if (!(vals.base_name || "").trim()) vals.base_name = vals.new_name;
             const session = await this.orm.call("biotex.classification.session", "workspace_update_line", [
                 [this.props.sessionId], this.props.lineId, vals,
