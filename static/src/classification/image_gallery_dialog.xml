@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="biotex_catalog.ClassificationImageGallery">
+        <Dialog title="props.title" size="'lg'" contentClass="'o_bcw_modal o_bcw_gallery_modal'" footer="false">
+            <div class="o_bcw_gallery" t-on-keydown="onKeydown" t-att-aria-label="'Imágenes de ' + props.title">
+                <figure class="o_bcw_gallery_stage" t-att-class="{ o_bcw_gallery_loading: state.loading }" aria-live="polite">
+                    <div t-if="state.loading" class="o_bcw_gallery_spinner" role="status" aria-label="Cargando imagen">
+                        <i class="fa fa-spinner fa-spin fa-2x" aria-hidden="true"/>
+                    </div>
+                    <div t-if="state.failed" class="o_bcw_gallery_failed"><i class="fa fa-exclamation-triangle" aria-hidden="true"/> No se pudo cargar la imagen.</div>
+                    <img t-else="" t-key="active.field" class="o_bcw_gallery_img" t-att-src="active.url" t-att-alt="active.label + ' de ' + props.title"
+                         t-on-load="onLoad" t-on-error="onError"/>
+                    <figcaption class="o_bcw_gallery_caption">
+                        <span class="o_bcw_gallery_label" t-esc="active.label"/>
+                        <span t-if="active.pending" class="o_bcw_gallery_pending">Pendiente de aplicar</span>
+                        <span t-if="images.length > 1" class="o_bcw_gallery_pos"><t t-esc="state.index + 1"/> / <t t-esc="images.length"/></span>
+                    </figcaption>
+                </figure>
+                <div t-if="images.length > 1" class="o_bcw_gallery_thumbs" role="tablist" aria-label="Miniaturas">
+                    <button t-foreach="images" t-as="image" t-key="image.field" type="button" role="tab"
+                            class="o_bcw_gallery_thumb" t-att-class="{ o_bcw_gallery_thumb_active: image_index === state.index }"
+                            t-att-aria-selected="image_index === state.index ? 'true' : 'false'" t-att-title="image.label"
+                            t-att-aria-label="'Ver ' + image.label.toLowerCase()" t-on-click="() => this.select(image_index)">
+                        <img t-att-src="image.thumb_url or image.url" t-att-alt="image.label" loading="lazy"/>
+                    </button>
+                </div>
+            </div>
+        </Dialog>
+    </t>
+</templates>

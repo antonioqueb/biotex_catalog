@@ -7,10 +7,15 @@
             <form>
                 <group>
                     <field name="family_id"/>
+                    <field name="product_ids" widget="many2many_tags"/>
+                    <field name="historical_prefix"/>
+                    <field name="component"/>
+                    <field name="measure_type"/>
                 </group>
                 <div class="alert alert-warning" role="alert">
-                    Se reasignarán las claves de toda la familia ordenando por nombre base y medida numérica.
-                    Los códigos propios (QR) se actualizan; las etiquetas impresas deberán reimprimirse.
+                    Se reasignarán las claves de los productos del filtro, ordenando por componente, tipo y medida numérica.
+                    La numeración continuará después del último consecutivo usado o reservado de cada clasificación; no reinicia en 01.
+                    Las claves anteriores se conservan en el historial. Los códigos propios anteriores siguen identificando el producto.
                 </div>
                 <field name="preview"/>
                 <footer>

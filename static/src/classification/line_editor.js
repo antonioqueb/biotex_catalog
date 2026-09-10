@@ -9,6 +9,12 @@ class BiotexEditorDialog extends Dialog {
     dismiss() { return this.props.requestClose(); }
 }
 
+class BiotexPhotoPreviewDialog extends Component {
+    static template = "biotex_catalog.ClassificationPhotoPreview";
+    static components = { Dialog };
+    static props = { close: Function, src: String, label: String };
+}
+
 /**
  * Modal "Editar producto clasificado" de la etapa 3.
  *
@@ -31,6 +37,7 @@ export class BiotexLineEditorDialog extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
         this.nameInput = useRef("editorName");
         this.state = useState({
             loading: true,
@@ -44,6 +51,8 @@ export class BiotexLineEditorDialog extends Component {
             saving: false,
             confirmClose: false,
             detailsOpen: false,
+            readingImages: 0,
+            photoPreviews: {},
             lookups: { manufacturer: [], distributor: [], equipment: [] },
         });
         onMounted(() => this.nameInput.el?.focus());
@@ -62,7 +71,6 @@ export class BiotexLineEditorDialog extends Component {
                 content: data.line.content || "",
                 package_type_id: data.line.package_type_id || false,
                 package_qty: data.line.package_qty || 1,
-                brand_id: data.line.brand_id || false,
                 manufacturer_ref: data.line.manufacturer_ref || "",
                 model: data.line.model || "",
                 barcode: data.line.barcode || "",
@@ -72,9 +80,17 @@ export class BiotexLineEditorDialog extends Component {
                 equipment_id: data.line.equipment_id || false,
                 specialty_id: data.line.specialty_id || false,
                 notes: data.line.notes || "",
+                base_name: data.line.base_name || data.line.new_name || "",
+                description_extra: data.line.description_extra || "",
+                usage_notes: data.line.usage_notes || "",
+                internal_notes: data.line.internal_notes || "",
+                compatibility_notes: data.line.compatibility_notes || "",
+                measure_data: JSON.parse(JSON.stringify(data.line.measure_data || [])),
+                presentation_data: JSON.parse(JSON.stringify(data.line.presentation_data || [])),
+                image_changes: {},
             };
             this.state.draft = d;
-            this.state.initial = { ...d };
+            this.state.initial = JSON.parse(JSON.stringify(d));
             this.state.labels = {
                 manufacturer: data.line.manufacturer_name || "",
                 distributor: data.line.distributor_name || "",
@@ -86,24 +102,61 @@ export class BiotexLineEditorDialog extends Component {
 
     // ------------------------------------------------------------------ estado
     toggleDetails() { this.state.detailsOpen = !this.state.detailsOpen; }
+    photoUrl(photo) {
+        const changes = this.state.draft.image_changes;
+        if (Object.hasOwn(changes, photo.field)) {
+            return changes[photo.field] === false ? photo.original_url : this.state.photoPreviews[photo.field];
+        }
+        return photo.url;
+    }
+    photoPending(photo) {
+        const changes = this.state.draft.image_changes;
+        return Object.hasOwn(changes, photo.field) ? changes[photo.field] !== false : photo.pending;
+    }
+    previewPhoto(photo) {
+        const src = this.photoUrl(photo);
+        if (src) this.dialog.add(BiotexPhotoPreviewDialog, { src, label: photo.label });
+    }
+    async selectPhoto(photo, ev) {
+        const input = ev.target;
+        const file = input.files?.[0];
+        if (!file || this.props.readonly || this.state.saving || this.state.readingImages) return;
+        input.value = "";
+        if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type) || file.size > 10 * 1024 * 1024) {
+            this.notification.add(_t("Selecciona una imagen JPG, PNG, WebP o GIF de hasta 10 MB."), { type: "warning" });
+            return;
+        }
+        this.state.readingImages++;
+        try {
+            const data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error(_t("No se pudo leer la imagen.")));
+                reader.readAsDataURL(file);
+            });
+            this.state.photoPreviews[photo.field] = data;
+            this.state.draft.image_changes[photo.field] = data.split(",", 2)[1];
+        } catch (error) {
+            this.notification.add(error.message, { type: "danger" });
+        } finally {
+            this.state.readingImages--;
+        }
+    }
+    useCurrentPhoto(photo) {
+        if (this.props.readonly || this.state.saving || this.state.readingImages) return;
+        this.state.draft.image_changes[photo.field] = false;
+    }
     get dirty() {
-        return Object.keys(this.state.initial).some((k) => this.state.draft[k] !== this.state.initial[k]);
+        return JSON.stringify(this.state.draft) !== JSON.stringify(this.state.initial);
     }
     get consecutiveLabel() {
         return this.state.line.consecutive_label || "";
     }
-    get brandWarning() {
-        const b = this.state.draft.brand_id;
-        return b && this.state.classificationBrandId && b !== this.state.classificationBrandId;
-    }
-    get brandName() {
-        const b = this.state.catalogs.brands.find((x) => x.id === this.state.draft.brand_id);
-        return b ? `${b.code} · ${b.name}` : "";
-    }
-
     // ------------------------------------------------------------------ entrada
     onInput(field, ev) {
-        this.state.draft[field] = ev.target.value;
+        this.state.draft[field] = field === "barcode" || field === "manufacturer_ref" ? ev.target.value : ev.target.value.toUpperCase();
+        ev.target.value = this.state.draft[field];
+        if (["base_name", "description_extra", "measure"].includes(field)) this.refreshDescription();
         delete this.state.errors[field];
     }
     onNumber(field, ev) {
@@ -116,6 +169,7 @@ export class BiotexLineEditorDialog extends Component {
     }
     async onLookup(kind, ev) {
         const query = ev.target.value;
+        this.state.labels[kind + "Query"] = query;
         if (query.length < 2) {
             this.state.lookups[kind] = [];
             return;
@@ -137,13 +191,44 @@ export class BiotexLineEditorDialog extends Component {
         this.state.labels[kind] = "";
     }
 
+    refreshDescription() {
+        const d = this.state.draft;
+        const measures = d.measure_data.length ? d.measure_data.map((r) => [r.component, r.measure_type, r.value, r.unit].filter((x) => x !== "").join(" ")).join("; ") : d.measure;
+        d.new_name = [d.base_name, measures, d.description_extra].filter(Boolean).join(" ").toUpperCase();
+    }
+    addRow(kind) {
+        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { name: "", quantity: 1, barcode: "" });
+    }
+    removeRow(kind, index) {
+        this.state.draft[kind].splice(index, 1);
+        if (kind === "measure_data") this.refreshDescription();
+    }
+    onRow(kind, index, field, ev) {
+        const raw = ev.target.value;
+        this.state.draft[kind][index][field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
+        if (kind === "measure_data") this.refreshDescription();
+    }
+    async createRelation(kind) {
+        const name = (this.state.labels[kind + "Query"] || "").trim();
+        if (!name) return;
+        try {
+            const record = await this.orm.call("biotex.classification.session", "workspace_create_relation", [kind, name]);
+            this.pick(kind, record);
+        } catch (e) {
+            this.notification.add(e.data?.message || e.message, { type: "danger" });
+        }
+    }
+
     // ------------------------------------------------------------------ validación
     validate() {
         const errors = {};
-        if (!(this.state.draft.new_name || "").trim()) errors.new_name = _t("Indica el nuevo nombre del producto.");
+        if (!(this.state.draft.base_name || "").trim()) errors.new_name = _t("Indica la descripción base del producto.");
         if (!this.state.draft.uom_id) errors.uom_id = _t("Selecciona la unidad de medida.");
         const qty = this.state.draft.package_qty;
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
+        if (this.state.draft.measure_data.some((r) => !r.component.trim() || !r.measure_type.trim() || !r.unit.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, tipo, valor positivo y unidad en cada medida.");
+        const presentations = this.state.draft.presentation_data;
+        if (presentations.some((r) => !r.name.trim() || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada presentación requiere nombre, cantidad entera positiva y un código distinto.");
         this.state.errors = errors;
         if (errors.package_qty) this.state.detailsOpen = true;
         return !Object.keys(errors).length;
@@ -151,7 +236,7 @@ export class BiotexLineEditorDialog extends Component {
 
     // ------------------------------------------------------------------ guardar / cancelar
     async save() {
-        if (this.props.readonly || this.state.saving || !this.validate()) return;
+        if (this.props.readonly || this.state.saving || this.state.readingImages || !this.validate()) return;
         this.state.saving = true;
         try {
             const vals = { ...this.state.draft };
@@ -169,7 +254,7 @@ export class BiotexLineEditorDialog extends Component {
         }
     }
     requestClose() {
-        if (this.state.saving) return;
+        if (this.state.saving || this.state.readingImages) return;
         if (this.dirty && !this.props.readonly) {
             this.state.confirmClose = true;
             return;

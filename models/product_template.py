@@ -30,7 +30,7 @@ class ProductTemplate(models.Model):
     biotex_name = fields.Char(string='Descripción', help='Ej. "Electrodo de broche para ECG redondo autoadherible". Sin marca ni medida.')
     biotex_measure = fields.Char(string='Medidas', help='Ej. 36 mm x 44 mm; 21G x 32 mm; 5 ml.')
     biotex_measure_value = fields.Float(string='Medida numérica', compute='_compute_measure_value', store=True)
-    biotex_content = fields.Char(string='Unidad indivisible (UI)', help='Presentación mínima de venta. Ej. "Bolsa con 50", "Pieza", "Sobre con 1".')
+    biotex_content = fields.Char(string='Texto de presentación anterior', help='Dato conservado de la captura anterior. La unidad operativa se define en Unidad indivisible.')
     biotex_package_type_id = fields.Many2one('biotex.package.type', string='Tipo de empaque', ondelete='restrict')
     biotex_package_qty = fields.Float(string='Cantidad por presentación', default=1.0)
 
@@ -102,7 +102,8 @@ class ProductTemplate(models.Model):
             p.biotex_own_code = not p.biotex_reference and not p.barcode
 
     @api.depends('categ_id', 'biotex_classifier_id', 'default_code', 'biotex_name', 'biotex_measure', 'biotex_brand_id',
-                 'image_1920', 'biotex_image_2', 'biotex_image_3', 'biotex_photo_waived', 'categ_id.biotex_photo_required')
+                 'image_1920', 'biotex_image_2', 'biotex_image_3', 'biotex_photo_waived', 'categ_id.biotex_photo_required',
+                 'categ_id.biotex_measure_required', 'biotex_measure_ids', 'name', 'uom_id')
     def _compute_class_state(self):
         for p in self:
             photos = sum(1 for img in (p.image_1920, p.biotex_image_2, p.biotex_image_3) if img)
@@ -116,9 +117,11 @@ class ProductTemplate(models.Model):
                 missing.append('marca')
             if not p.default_code:
                 missing.append('clave')
-            if not p.biotex_name:
+            if not (p.biotex_name or p.name):
                 missing.append('descripción')
-            if not p.biotex_measure:
+            if not p.uom_id:
+                missing.append('unidad indivisible')
+            if p.categ_id.biotex_measure_required and not (p.biotex_measure or p.biotex_measure_ids):
                 missing.append('medidas')
             if missing:
                 p.biotex_class_state = 'unclassified'
@@ -189,14 +192,26 @@ class ProductTemplate(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
+        records._biotex_observe_consecutives()
         records._biotex_sync_group_tag()
         return records
 
     def write(self, vals):
+        if {'default_code', 'biotex_consecutive'} & set(vals):
+            self._biotex_observe_consecutives()
         res = super().write(vals)
+        if {'default_code', 'biotex_consecutive'} & set(vals):
+            self._biotex_observe_consecutives()
         if 'categ_id' in vals or 'biotex_family_id' in vals:
             self._biotex_sync_group_tag()
         return res
+
+    def _biotex_observe_consecutives(self):
+        counter = self.env['biotex.product.sequence']
+        for product in self:
+            parts = counter._split_code(product.default_code)
+            if parts:
+                counter._advance(parts[0], max(parts[1], product.biotex_consecutive or 0))
 
     # ------------------------------------------------------------------ clave
     def _biotex_clave_prefix(self):
@@ -213,17 +228,26 @@ class ProductTemplate(models.Model):
     def biotex_preview_clave(self):
         self.ensure_one()
         prefix = self._biotex_clave_prefix()
-        last = self.search([('default_code', '=like', prefix + '%'), ('id', '!=', self.id)], order='biotex_consecutive desc', limit=1)
-        return '%s%02d' % (prefix, (last.biotex_consecutive or 0) + 1)
+        counter = self.env['biotex.product.sequence']
+        parts = counter._split_code(self.default_code)
+        if parts and parts[0] + '-' == prefix:
+            return self.default_code
+        return '%s%02d' % (prefix, counter._next(prefix))
 
     def action_assign_clave(self):
         """Clave GG-MMMM-FFF-CCC-NN, código propio si no hay referencia ni barcode, y genérico."""
+        self.check_access('write')
+        counter = self.env['biotex.product.sequence']
         for p in self:
             if p.default_code and p.biotex_consecutive:
                 continue
             prefix = p._biotex_clave_prefix()
-            last = self.search([('default_code', '=like', prefix + '%'), ('id', '!=', p.id)], order='biotex_consecutive desc', limit=1)
-            n = (last.biotex_consecutive or 0) + 1
+            parts = counter._split_code(p.default_code)
+            if parts and parts[0] + '-' == prefix:
+                p.biotex_consecutive = parts[1]
+                counter._observe_codes([p.default_code])
+                continue
+            n = counter._next(prefix, reserve=True)
             vals = {'default_code': '%s%02d' % (prefix, n), 'biotex_consecutive': n}
             if not p.barcode and not p.biotex_reference:
                 vals['barcode'] = vals['default_code']
@@ -235,7 +259,7 @@ class ProductTemplate(models.Model):
         return True
 
     def action_open_classifier(self):
-        return {'type': 'ir.actions.client', 'tag': 'biotex_catalog.classifier', 'name': 'Asistente de clasificación',
+        return {'type': 'ir.actions.client', 'tag': 'biotex_catalog.classification_workspace', 'name': 'Asistente de clasificación',
                 'context': {'biotex_product_ids': self.ids}}
 
     def action_print_qr_label(self):
@@ -270,12 +294,15 @@ class ProductTemplate(models.Model):
         if not (fam and cls and brand and brand.code):
             return {'clave': '', 'generic': ''}
         prefix = '%s-%s-%s-%s-' % (fam.biotex_group_id.code, brand.code, fam.biotex_code, cls.code)
-        last = self.search([('default_code', '=like', prefix + '%')], order='biotex_consecutive desc', limit=1)
-        exclude = vals.get('id')
-        if exclude and last.id == exclude:
-            return {'clave': last.default_code, 'generic': last.biotex_generic_id.code or ''}
+        counter = self.env['biotex.product.sequence']
+        current = self.browse(vals.get('id')).exists() if vals.get('id') else self.browse()
+        if current:
+            current.check_access('read')
+            parts = counter._split_code(current.default_code)
+            if parts and parts[0] + '-' == prefix:
+                return {'clave': current.default_code, 'generic': current.biotex_generic_id.code or ''}
         gprefix = 'G-%s-%s-%s-' % (fam.biotex_group_id.code, fam.biotex_code, cls.code)
-        return {'clave': '%s%02d' % (prefix, (last.biotex_consecutive or 0) + 1), 'generic': gprefix + '…'}
+        return {'clave': '%s%02d' % (prefix, counter._next(prefix)), 'generic': gprefix + '…'}
 
     @api.model
     def biotex_classifier_queue(self, product_ids=None, limit=200):

@@ -1,9 +1,34 @@
 from odoo import api, models
+from odoo.exceptions import ValidationError
 from odoo.fields import Domain
 
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        self.env['biotex.product.sequence']._observe_codes(records.mapped('default_code'))
+        records._check_biotex_unique_code()
+        return records
+
+    def write(self, vals):
+        if 'default_code' in vals:
+            self.env['biotex.product.sequence']._observe_codes(self.mapped('default_code'))
+        result = super().write(vals)
+        if 'default_code' in vals:
+            self.env['biotex.product.sequence']._observe_codes(self.mapped('default_code'))
+            self._check_biotex_unique_code()
+        return result
+
+    def _check_biotex_unique_code(self):
+        counter = self.env['biotex.product.sequence']
+        for product in self:
+            if counter._split_code(product.default_code) and self.sudo().with_context(active_test=False).search_count([
+                ('default_code', '=', product.default_code), ('id', '!=', product.id),
+            ], limit=1):
+                raise ValidationError('La clave %s ya está utilizada por otro producto. Genere una clave nueva.' % product.default_code)
 
     @api.model
     def _search_display_name(self, operator, value):

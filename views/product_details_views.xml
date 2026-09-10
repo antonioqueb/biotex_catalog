@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="menu_biotex_classifier" model="ir.ui.menu"><field name="active" eval="False"/></record>
+    <record id="view_product_details_form" model="ir.ui.view">
+        <field name="name">product.template.details.biotex</field><field name="model">product.template</field>
+        <field name="inherit_id" ref="view_product_template_form_biotex"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[field[@name='biotex_name']]" position="replace">
+                <group string="Descripción">
+                    <field name="biotex_name" string="Descripción base"/>
+                    <field name="biotex_description_extra"/>
+                    <field name="biotex_description_auto" readonly="1"/>
+                    <button name="action_use_structured_description" type="object" string="Usar descripción automática"/>
+                    <field name="biotex_high_rotation"/>
+                    <field name="biotex_optional_missing" readonly="1"/>
+                </group>
+            </xpath>
+            <xpath expr="//field[@name='biotex_manufacturer_id']" position="attributes">
+                <attribute name="context">{'default_is_company': True, 'default_biotex_is_manufacturer': True}</attribute>
+                <attribute name="domain">[('biotex_is_manufacturer','=',True)]</attribute>
+            </xpath>
+            <xpath expr="//field[@name='biotex_primary_distributor_id']" position="attributes">
+                <attribute name="context">{'default_is_company': True, 'default_biotex_is_primary_distributor': True, 'default_supplier_rank': 1}</attribute>
+                <attribute name="domain">[('biotex_is_primary_distributor','=',True)]</attribute>
+            </xpath>
+            <xpath expr="//field[@name='biotex_characteristics']" position="attributes"><attribute name="placeholder">Material, esterilidad y características físicas.</attribute></xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="biotex_measurements" string="Medidas">
+                    <p>Agregue una línea por componente y tipo de medida. Por ejemplo: AGUJA / LARGO / 32 / MM, AGUJA / CALIBRE / 21 / G y CABLE / LARGO / 150 / CM.</p>
+                    <field name="biotex_measure_ids"><list editable="bottom">
+                        <field name="sequence" widget="handle"/><field name="component"/><field name="measure_type"/><field name="value"/><field name="unit"/>
+                    </list></field>
+                    <group><field name="biotex_measure" string="Medidas anteriores (texto opcional)"/></group>
+                </page>
+                <page name="biotex_presentations" string="Presentaciones y códigos">
+                    <p>Cada presentación corresponde al mismo producto y conserva su clave. Defina su equivalencia respecto de la unidad indivisible. El código principal permanece en la ficha general.</p>
+                    <field name="biotex_presentation_ids"><list editable="bottom">
+                        <field name="uom_id" string="Presentación"/><field name="biotex_quantity" readonly="1"/><field name="barcode"/><field name="company_id" groups="base.group_multi_company"/>
+                    </list></field>
+                    <group string="Datos de empaque anteriores (opcionales)">
+                        <field name="biotex_content"/><field name="biotex_package_type_id"/><field name="biotex_package_qty"/>
+                    </group>
+                </page>
+                <page name="biotex_notes" string="Uso y notas">
+                    <group><field name="biotex_usage_notes"/><field name="biotex_compatibility_notes"/><field name="biotex_internal_notes"/></group>
+                </page>
+                <page name="biotex_code_history" string="Claves anteriores">
+                    <field name="biotex_merged_into_id" invisible="not biotex_merged_into_id"/>
+                    <field name="biotex_code_history_ids" readonly="1"><list create="0" edit="0" delete="0"><field name="code"/><field name="prefix"/><field name="consecutive"/><field name="reason"/><field name="create_date"/></list></field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="view_product_indivisible_unit" model="ir.ui.view">
+        <field name="name">product.template.indivisible.unit</field><field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml"><xpath expr="//field[@name='uom_id']" position="attributes"><attribute name="string">Unidad indivisible (compra, venta y conteo)</attribute></xpath></field>
+    </record>
+    <record id="view_product_details_search" model="ir.ui.view">
+        <field name="name">product.template.details.search</field><field name="model">product.template</field>
+        <field name="inherit_id" ref="view_product_template_search_biotex"/>
+        <field name="arch" type="xml"><xpath expr="//search" position="inside"><field name="biotex_measure_summary"/><field name="biotex_code_history_ids" string="Clave o clasificación anterior" filter_domain="['|',('biotex_code_history_ids.code','ilike',self),('biotex_code_history_ids.prefix','ilike',self)]"/></xpath></field>
+    </record>
+    <record id="action_biotex_code_history" model="ir.actions.act_window">
+        <field name="name">Historial de claves</field><field name="res_model">biotex.product.code.history</field><field name="view_mode">list,form</field>
+    </record>
+    <record id="action_biotex_sequences" model="ir.actions.act_window">
+        <field name="name">Últimos consecutivos</field><field name="res_model">biotex.product.sequence</field><field name="view_mode">list</field>
+    </record>
+    <record id="action_biotex_reorder" model="ir.actions.act_window">
+        <field name="name">Reordenar por medida</field><field name="res_model">biotex.reorder.wizard</field><field name="view_mode">form</field><field name="target">new</field>
+    </record>
+    <menuitem id="menu_biotex_codes" name="Claves y consecutivos" parent="menu_catalog_root" sequence="35" groups="biotex_base.group_biotex_direction"/>
+    <menuitem id="menu_biotex_sequences" name="Últimos consecutivos" parent="menu_biotex_codes" action="action_biotex_sequences" sequence="10"/>
+    <menuitem id="menu_biotex_code_history" name="Historial de claves" parent="menu_biotex_codes" action="action_biotex_code_history" sequence="20"/>
+    <menuitem id="menu_biotex_reorder" name="Reordenar por medida" parent="menu_biotex_codes" action="action_biotex_reorder" sequence="30"/>
+    <record id="action_biotex_manufacturers" model="ir.actions.act_window">
+        <field name="name">Fabricantes</field><field name="res_model">res.partner</field><field name="view_mode">list,form</field><field name="domain">[('biotex_is_manufacturer','=',True)]</field><field name="context">{'default_is_company':True,'default_biotex_is_manufacturer':True}</field>
+    </record>
+    <record id="action_biotex_distributors" model="ir.actions.act_window">
+        <field name="name">Distribuidores primarios</field><field name="res_model">res.partner</field><field name="view_mode">list,form</field><field name="domain">[('biotex_is_primary_distributor','=',True)]</field><field name="context">{'default_is_company':True,'default_biotex_is_primary_distributor':True,'default_supplier_rank':1}</field>
+    </record>
+    <menuitem id="menu_biotex_manufacturers" name="Fabricantes" parent="menu_catalog_config" action="action_biotex_manufacturers" sequence="31"/>
+    <menuitem id="menu_biotex_distributors" name="Distribuidores primarios" parent="menu_catalog_config" action="action_biotex_distributors" sequence="32"/>
+    <record id="view_family_measure_requirement" model="ir.ui.view">
+        <field name="name">product.category.measure.requirement</field><field name="model">product.category</field><field name="inherit_id" ref="product.product_category_form_view"/>
+        <field name="arch" type="xml"><xpath expr="//sheet" position="inside"><group string="Validación del catálogo"><field name="biotex_measure_required"/></group></xpath></field>
+    </record>
+    <record id="view_merge_product_form" model="ir.ui.view">
+        <field name="name">biotex.product.merge.wizard.form</field><field name="model">biotex.product.merge.wizard</field>
+        <field name="arch" type="xml"><form string="Unificar productos duplicados">
+            <group><field name="product_ids" widget="many2many_tags"/><field name="target_id" domain="[('id','in',product_ids)]"/></group>
+            <p>Seleccione registros que correspondan al mismo artículo. Se conservará el producto destino, se consolidarán las existencias por ubicación y empresa y se archivarán los otros registros con su historial.</p>
+            <field name="preview"/>
+            <footer><button name="action_merge" type="object" string="Unificar registros" class="btn-primary"/><button special="cancel" string="Cancelar"/></footer>
+        </form></field>
+    </record>
+    <record id="action_server_merge_products" model="ir.actions.server">
+        <field name="name">Unificar duplicados</field><field name="model_id" ref="product.model_product_template"/><field name="binding_model_id" ref="product.model_product_template"/><field name="binding_view_types">list</field>
+        <field name="group_ids" eval="[(4,ref('biotex_base.group_biotex_direction'))]"/>
+        <field name="state">code</field><field name="code">action = {'type':'ir.actions.act_window','name':'Unificar duplicados','res_model':'biotex.product.merge.wizard','view_mode':'form','target':'new','context':{'default_product_ids':[(6,0,records.ids)],'default_target_id':records[:1].id}}</field>
+    </record>
+    <record id="action_server_reorder_products" model="ir.actions.server">
+        <field name="name">Reordenar claves por medida</field><field name="model_id" ref="product.model_product_template"/><field name="binding_model_id" ref="product.model_product_template"/><field name="binding_view_types">list</field>
+        <field name="group_ids" eval="[(4,ref('biotex_base.group_biotex_direction'))]"/>
+        <field name="state">code</field><field name="code">action = {'type':'ir.actions.act_window','name':'Reordenar por medida','res_model':'biotex.reorder.wizard','view_mode':'form','target':'new','context':{'default_product_ids':[(6,0,records.ids)]}}</field>
+    </record>
+</odoo>

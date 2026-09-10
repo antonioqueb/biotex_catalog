@@ -10,8 +10,8 @@ Reglas de la iteración 1:
 * El consecutivo se **reserva al agregar** el producto y ya no cambia al reordenar la lista: el
   orden es prioridad de trabajo, la numeración es identidad. Solo se reasigna si cambia la
   clasificación de la sesión (cambia el prefijo, luego la referencia entera deja de valer).
-* La referencia solo se escribe en `default_code` **al confirmar** la sesión. Mientras esté en
-  borrador es una vista previa: nada se reserva en el catálogo.
+* La referencia solo se escribe en `default_code` **al confirmar** la sesión. El número queda
+  reservado desde el agregado, incluso si después se cancela o elimina el borrador.
 * El formato de clave es el del esquema v2 vigente, `GG-MMMM-FFF-CCC-NN`
   (grupo · marca · familia · clasificador · consecutivo), el mismo que produce
   `product.template.action_assign_clave`.
@@ -23,6 +23,7 @@ from markupsafe import Markup
 from odoo import api, fields, models
 from odoo.tools import SQL
 from odoo.exceptions import UserError, ValidationError
+from .product_details import clean_measures, upper
 from odoo.fields import Domain
 
 CONSECUTIVE_FORMAT = '%02d'
@@ -103,24 +104,36 @@ class BiotexClassificationSession(models.Model):
         self.invalidate_recordset()
 
     def _next_consecutive(self):
-        """Primer consecutivo libre del prefijo: mira las claves ya escritas y las reservadas por otras sesiones."""
+        """Reserva el siguiente número compartido con el generador individual."""
         self.ensure_one()
         if not self.class_code:
             raise UserError('Defina la clasificación completa antes de reservar consecutivos.')
-        product = self.env['product.template'].search(
-            [('default_code', '=like', self.class_code + '-%')], order='biotex_consecutive desc', limit=1)
-        line = self.env['biotex.classification.session.line'].search(
-            [('session_id.class_code', '=', self.class_code), ('session_id.state', '!=', 'cancelled')],
-            order='consecutive desc', limit=1)
-        return max(product.biotex_consecutive or 0, line.consecutive or 0) + 1
+        return self.env['biotex.product.sequence']._next(self.class_code, reserve=True)
 
     def _reassign_consecutives(self):
         """Renumera la sesión completa: solo tras cambiar la clasificación, porque cambia el prefijo."""
         self.ensure_one()
         lines = self.line_ids.sorted(lambda l: (l.sequence, l.id))
-        lines.consecutive = 0
+        super(BiotexClassificationSessionLine, lines).write({'consecutive': 0})
         for line in lines:
-            line.consecutive = self._next_consecutive()
+            line._reserve_consecutive()
+
+    def _ensure_reservations(self):
+        """Repair colliding legacy drafts before building the confirmation revision."""
+        self.ensure_one()
+        self._lock_workspace()
+        self._check_editable()
+        Line = self.env['biotex.classification.session.line'].sudo()
+        Product = self.env['product.product'].sudo().with_context(active_test=False)
+        for line in self.line_ids.sorted('id'):
+            collision = not line.consecutive or Line.search_count([
+                ('session_id.class_code', '=', self.class_code), ('consecutive', '=', line.consecutive),
+                ('id', '!=', line.id),
+            ], limit=1) or Product.search_count([
+                ('default_code', '=', line.reference), ('product_tmpl_id', '!=', line.product_id.id),
+            ], limit=1)
+            if collision:
+                line._reserve_consecutive()
 
     # ------------------------------------------------------------------ acciones
     def action_open_workspace(self):
@@ -170,7 +183,15 @@ class BiotexClassificationSession(models.Model):
             raise UserError('La sesión confirmada conserva su historial. Cree una nueva sesión para reclasificar.')
         if vals.get('state') == 'confirmed':
             raise UserError('Use Generar claves para confirmar la sesión.')
-        return super().write(vals)
+        previous = {session.id: session.class_code for session in self}
+        result = super().write(vals)
+        for session in self:
+            if session.class_code != previous[session.id] and session.line_ids:
+                if session.class_code:
+                    session._reassign_consecutives()
+                else:
+                    super(BiotexClassificationSessionLine, session.line_ids).write({'consecutive': 0})
+        return result
 
     def unlink(self):
         self._lock_workspace()
@@ -235,14 +256,7 @@ class BiotexClassificationSession(models.Model):
         else:
             session._lock_workspace()
             session._check_editable()
-            previous = session.class_code
             session.write(clean)
-            if session.class_code != previous and session.line_ids:
-                # cambió el prefijo: la referencia entera deja de valer y hay que renumerar
-                if session.class_code:
-                    session._reassign_consecutives()
-                else:
-                    session.line_ids.consecutive = 0
         return session._workspace_session()
 
     def workspace_search_products(self, query='', offset=0, limit=20):
@@ -291,7 +305,6 @@ class BiotexClassificationSession(models.Model):
                 'session_id': self.id,
                 'product_id': product.id,
                 'sequence': sequence,
-                'consecutive': self._next_consecutive(),
                 'old_name': product.name,
                 'old_reference': product.default_code or '',
                 'new_name': product.name,
@@ -310,6 +323,13 @@ class BiotexClassificationSession(models.Model):
                 'equipment_id': product.biotex_main_equipment_id.id,
                 'specialty_id': product.biotex_main_specialty_id.id,
                 'notes': product.biotex_characteristics,
+                'base_name': product.biotex_name or product.name,
+                'description_extra': product.biotex_description_extra,
+                'usage_notes': product.biotex_usage_notes,
+                'internal_notes': product.biotex_internal_notes,
+                'compatibility_notes': product.biotex_compatibility_notes,
+                'measure_data': product.biotex_measure_ids._data(),
+                'presentation_data': product._biotex_presentation_data(),
             })
         return self._workspace_session()
 
@@ -340,6 +360,8 @@ class BiotexClassificationSession(models.Model):
             raise UserError('La línea ya no pertenece a esta sesión.')
         allowed = ('new_name', 'uom_id') + Line.DETAIL_FIELDS
         clean = {k: v for k, v in vals.items() if k in allowed}
+        if 'base_name' in clean and not (clean['base_name'] or '').strip():
+            raise UserError('La descripción base es obligatoria.')
         def effective(field, current):
             # un campo enviado vacío es un borrado deliberado; uno ausente conserva lo guardado
             return clean[field] if field in clean else current
@@ -361,13 +383,10 @@ class BiotexClassificationSession(models.Model):
             if other:
                 raise UserError('El código de barras %s ya está capturado en la línea "%s" de esta clasificación.' % (barcode, other.display_name))
             clean['barcode'] = barcode
-        ref = (clean.get('manufacturer_ref') or '').strip()
-        if ref:
-            clash = self.env['product.template'].search(
-                [('biotex_reference', '=ilike', ref), ('id', '!=', line.product_id.id)], limit=1)
-            if clash:
-                raise UserError('La referencia del fabricante %s ya pertenece a "%s". No se repite entre productos.' % (ref, clash.display_name))
-            clean['manufacturer_ref'] = ref
+        if 'manufacturer_ref' in clean:
+            clean['manufacturer_ref'] = (clean['manufacturer_ref'] or '').strip()
+        if 'measure_data' in clean:
+            clean['measure_data'] = clean_measures(clean['measure_data'])
         line.write(clean)
         return self._workspace_session()
 
@@ -421,6 +440,7 @@ class BiotexClassificationSession(models.Model):
         self.ensure_one()
         self.check_access('read')
         self._check_editable()
+        self._ensure_reservations()
         changes = []
         version = [self.class_code, self.company_id.id]
         for line in self.line_ids.sorted('id'):
@@ -429,7 +449,8 @@ class BiotexClassificationSession(models.Model):
             if previous and previous != line.reference:
                 changes.append({'id': product.id, 'name': product.name, 'before': previous, 'after': line.reference})
             version.append([line._workspace_detail(), previous, str(product.write_date),
-                            product.name, product.uom_id.id, line._classification_description(product)])
+                            product.name, product.uom_id.id, line._classification_description(product),
+                            product.biotex_measure_ids._data(), product._biotex_presentation_data()])
         return {'revision': hashlib.sha256(json.dumps(version).encode()).hexdigest(),
                 'count': len(self.line_ids), 'changes': changes}
 
@@ -492,8 +513,17 @@ class BiotexClassificationSessionLine(models.Model):
     specialty_id = fields.Many2one('biotex.specialty', string='Especialidad')
     notes = fields.Text(string='Notas')
 
-    DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'brand_id', 'manufacturer_ref', 'model',
-                     'barcode', 'country_id', 'manufacturer_id', 'distributor_id', 'equipment_id', 'specialty_id', 'notes')
+    base_name = fields.Char(string='Descripción base')
+    description_extra = fields.Char(string='Complemento de descripción')
+    usage_notes = fields.Text(string='Notas de uso')
+    internal_notes = fields.Text(string='Notas internas')
+    compatibility_notes = fields.Text(string='Compatibilidad')
+    measure_data = fields.Json(string='Medidas por componente', default=list)
+    presentation_data = fields.Json(string='Presentaciones y códigos', default=list)
+
+    DETAIL_FIELDS = ('measure', 'content', 'package_type_id', 'package_qty', 'manufacturer_ref', 'model',
+                     'barcode', 'country_id', 'manufacturer_id', 'distributor_id', 'equipment_id', 'specialty_id', 'notes',
+                     'base_name','description_extra','usage_notes','internal_notes','compatibility_notes','measure_data','presentation_data')
     AUDIT_FIELDS = ('applied_reference_before', 'applied_reference_after', 'applied_classification_before',
                    'applied_classification_after', 'applied_by_id', 'applied_on')
 
@@ -505,15 +535,29 @@ class BiotexClassificationSessionLine(models.Model):
             session._check_editable()
         if any(set(vals) & set(self.AUDIT_FIELDS) or vals.get('state', 'draft') != 'draft' for vals in vals_list):
             raise UserError('El historial de aplicación se registra al confirmar.')
-        return super().create(vals_list)
+        prepared = []
+        for vals in vals_list:
+            session = sessions.browse(vals['session_id'])
+            prepared.append(dict(vals, consecutive=session._next_consecutive()))
+        return super().create([{**v, **{k: upper(v[k]) for k in self._upper_fields() if k in v}} for v in prepared])
 
     def write(self, vals):
         self.session_id._lock_workspace()
         if any(line.state == 'applied' or line.session_id.state != 'draft' for line in self):
             raise UserError('Conserve la línea aplicada en su sesión original.')
-        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name'}):
+        if set(vals) & (set(self.AUDIT_FIELDS) | {'state', 'session_id', 'product_id', 'old_reference', 'old_name', 'consecutive', 'reference'}):
             raise UserError('La identidad y el historial de la línea no se modifican manualmente.')
-        return super().write(vals)
+        if 'brand_id' in vals:
+            raise UserError('La marca se toma de la clasificación principal.')
+        return super().write({**vals, **{k: upper(vals[k]) for k in self._upper_fields() if k in vals}})
+
+    def _upper_fields(self):
+        return ('new_name','base_name','measure','content','model','notes','description_extra','usage_notes','internal_notes','compatibility_notes')
+
+    def _reserve_consecutive(self):
+        self.ensure_one()
+        self.session_id._check_editable()
+        return super().write({'consecutive': self.session_id._next_consecutive()})
 
     def unlink(self):
         self.session_id._lock_workspace()
@@ -558,7 +602,7 @@ class BiotexClassificationSessionLine(models.Model):
             'consecutive_label': CONSECUTIVE_FORMAT % self.consecutive if self.consecutive else '',
             'reference': self.reference or '',
             'state': self.state,
-            'brand_name': self.brand_id.display_name or '',
+            'brand_name': self.session_id.brand_id.display_name or '',
             'measure': self.measure or '',
             'barcode': self.barcode or '',
             'detail_filled': sum(1 for f in self.DETAIL_FIELDS if self[f]),
@@ -587,6 +631,8 @@ class BiotexClassificationSessionLine(models.Model):
             'specialty_id': self.specialty_id.id or False,
             'notes': self.notes or '',
         })
+        data.update({key: self[key] or ([] if key.endswith('_data') else '') for key in (
+            'base_name','description_extra','usage_notes','internal_notes','compatibility_notes','measure_data','presentation_data')})
         return data
 
     def _apply(self):
@@ -610,12 +656,17 @@ class BiotexClassificationSessionLine(models.Model):
         detail = {
             'biotex_measure': self.measure, 'biotex_content': self.content,
             'biotex_package_type_id': self.package_type_id.id, 'biotex_package_qty': self.package_qty or 1.0,
-            'biotex_brand_id': self.brand_id.id or session.brand_id.id,
+            'biotex_brand_id': session.brand_id.id,
             'biotex_reference': self.manufacturer_ref, 'biotex_model': self.model,
             'biotex_country_id': self.country_id.id, 'biotex_manufacturer_id': self.manufacturer_id.id,
             'biotex_primary_distributor_id': self.distributor_id.id, 'biotex_characteristics': self.notes,
         }
-        vals.update({k: v for k, v in detail.items() if v})
+        vals.update(detail)
+        vals.update({'biotex_name': self.base_name or self.new_name,
+                     'biotex_description_extra':self.description_extra,'biotex_usage_notes':self.usage_notes,
+                     'biotex_internal_notes':self.internal_notes,'biotex_compatibility_notes':self.compatibility_notes})
+        if self.measure_data is not None and self.measure_data is not False:
+            vals['biotex_measure_ids'] = [(5,0,0)] + [(0,0,row) for row in clean_measures(self.measure_data)]
         if self.barcode:
             vals['barcode'] = self.barcode
         elif not product.barcode and not product.biotex_reference and not self.manufacturer_ref:
@@ -627,6 +678,8 @@ class BiotexClassificationSessionLine(models.Model):
             vals['biotex_main_specialty_id'] = self.specialty_id.id
             vals['biotex_specialty_ids'] = [(4, self.specialty_id.id)]
         product.write(vals)
+        if self.presentation_data is not None and self.presentation_data is not False:
+            product._biotex_set_presentations(self.presentation_data)
         applied_on = fields.Datetime.now()
         current_classification = self._classification_description(product)
         super(BiotexClassificationSessionLine, self).write({

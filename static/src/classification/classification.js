@@ -7,6 +7,7 @@ import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { BiotexLineEditorDialog } from "./line_editor";
 import { BiotexClassificationReviewDialog } from "./review_dialog";
+import { BiotexImageGalleryDialog } from "./image_gallery_dialog";
 
 const MODEL = "biotex.classification.session";
 const PAGE_SIZE = 20;
@@ -43,6 +44,7 @@ export class BiotexClassificationWorkspace extends Component {
         this.destroyed = false;
         this.saveQueue = Promise.resolve();
         this.lineSaveErrors = new Set();
+        this.pendingProductIds = [...(this.props.action?.context?.biotex_product_ids || [])];
 
         this.state = useState({
             loading: true,
@@ -202,6 +204,12 @@ export class BiotexClassificationWorkspace extends Component {
             const data = await this.orm.call(MODEL, "workspace_set_classification", [this.state.session?.id || false, vals]);
             if (data) {
                 this.applySession(data);
+                if (this.pendingProductIds.length) {
+                    const populated = await this.orm.call(MODEL, "workspace_add_products", [[data.id], this.pendingProductIds]);
+                    this.applySession(populated);
+                    this.pendingProductIds = [];
+                    this.goStage(3);
+                }
                 await this.runSearch(0);
             } else {
                 // la clasificación está completa en pantalla: si el servidor no devuelve sesión, algo falló
@@ -417,6 +425,23 @@ export class BiotexClassificationWorkspace extends Component {
             classCode: this.state.session.class_code,
             readonly: this.confirmed,
             onSaved: (session) => { this.applySession(session); this.clearLineErrors(line.id); },
+        });
+    }
+
+    // ----------------------------------------------------------------- columna "Imagen"
+    // El servidor ya manda `images` (máximo 3) con cada línea: aquí no se consulta nada por fila.
+    imageCount(line) { return Math.min((line.images || []).length, 3); }
+
+    imageTitle(line) {
+        const count = this.imageCount(line);
+        return count > 1 ? `Ver ${count} imágenes` : "Ver imagen";
+    }
+
+    openImages(line) {
+        if (!this.imageCount(line)) return;
+        this.dialog.add(BiotexImageGalleryDialog, {
+            title: line.new_name || line.old_name || "Producto",
+            images: line.images.slice(0, 3),
         });
     }
 

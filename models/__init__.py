@@ -7,3 +7,7 @@ from . import product_template
 from . import product_product
 from . import biotex_classification
 from . import product_import
+from . import product_sequence
+from . import product_details
+from . import auxiliary_catalogs
+from . import classification_images

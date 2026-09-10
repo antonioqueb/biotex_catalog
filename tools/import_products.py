@@ -1,4 +1,4 @@
-"""QA-only incremental import into existing models; never creates stock events."""
+"""Incremental import; production requires the operator's explicit source digest."""
 import base64
 import json
 import re
@@ -19,13 +19,18 @@ def existing_products(env):
             for p in products]
 
 
-def import_products(env, filename, *, apply=False):
+def import_products(env, filename, *, apply=False, production_source_sha256=None):
     if not env.su:
         raise UserError('Esta migración debe ejecutarla el operador del servidor.')
     params = env['ir.config_parameter'].sudo()
-    if params.get_param('bioteczac.environment') != 'qa' or env.cr.dbname != 'bioteczac':
-        raise UserError('Este importador está limitado a QA.')
+    environment = params.get_param('bioteczac.environment')
+    if env.cr.dbname != 'bioteczac' or environment not in ('qa', 'production'):
+        raise UserError('Entorno no autorizado para esta migración.')
+    if environment == 'production' and not production_source_sha256:
+        raise UserError('La migración a producción requiere la huella del archivo autorizado.')
     data = read_products(filename)
+    if production_source_sha256 and data['sha256'] != production_source_sha256:
+        raise UserError('El archivo no coincide con la fuente autorizada para producción.')
     env.cr.execute("SELECT pg_advisory_xact_lock(hashtext('bioteczac.catalog.incremental'))")
     if apply:
         # Prevent native UI edits/creates from invalidating the reviewed identity

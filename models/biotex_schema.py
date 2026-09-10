@@ -206,9 +206,9 @@ class BiotexGeneric(models.Model):
         for g in records:
             if not g.code:
                 prefix = 'G-%s-%s-%s-' % (g.group_id.code, g.family_id.biotex_code, g.classifier_id.code)
-                last = self.search([('code', '=like', prefix + '%'), ('id', '!=', g.id)], order='consecutive desc', limit=1)
-                g.consecutive = (last.consecutive or 0) + 1
+                g.consecutive = self.env['biotex.product.sequence']._next(prefix, reserve=True)
                 g.code = '%s%03d' % (prefix, g.consecutive)
+        self.env['biotex.product.sequence']._observe_codes(records.mapped('code'))
         return records
 
     @api.model
