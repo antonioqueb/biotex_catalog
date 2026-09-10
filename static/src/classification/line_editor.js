@@ -5,6 +5,9 @@ import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
 import { referenceTones } from "./reference";
 
+/** Multi-selecciones cuyo catálogo completo ya viene en `workspace_line_detail`. */
+const LOCAL_LOOKUPS = ["country", "specialty"];
+
 class BiotexEditorDialog extends Dialog {
     static props = { ...Dialog.props, requestClose: Function };
     dismiss() { return this.props.requestClose(); }
@@ -231,16 +234,19 @@ export class BiotexLineEditorDialog extends Component {
         const query = ev.target.value;
         this.state.labels[kind + "Query"] = query;
         if (kind === "manufacturer") this.state.manufacturerSuggested = false;
-        if (query.length < 2) {
+        // Los catálogos cortos (especialidad, país, equipo) se despliegan al enfocar, sin escribir nada;
+        // los contactos (fabricante, distribuidor) piden al menos dos letras porque la lista es larga.
+        const minimum = LOCAL_LOOKUPS.includes(kind) || kind === "equipment" ? 0 : 2;
+        if (query.length < minimum) {
             this.state.lookups[kind] = [];
             return;
         }
-        if (kind === "country" || kind === "specialty") {
+        if (LOCAL_LOOKUPS.includes(kind)) {
             // catálogos ya cargados: se filtran en el cliente
             const q = query.toLowerCase();
             const chosen = new Set(this.state.draft[kind + "_ids"]);
             const source = kind === "country" ? this.state.catalogs.countries : this.state.catalogs.specialties;
-            this.state.lookups[kind] = source.filter((c) => !chosen.has(c.id) && c.name.toLowerCase().includes(q)).slice(0, 8);
+            this.state.lookups[kind] = source.filter((c) => !chosen.has(c.id) && c.name.toLowerCase().includes(q)).slice(0, kind === "specialty" ? 30 : 8);
             return;
         }
         const model = kind === "equipment" ? "biotex.equipment" : "res.partner";
@@ -248,6 +254,20 @@ export class BiotexLineEditorDialog extends Component {
         this.state.lookups[kind] = await this.orm.call(
             "biotex.classification.session", "workspace_search_relation", [model, query], { context: ctx });
     }
+    /** Cierra la lista al salir del campo; los elementos usan pointerdown.prevent para no robar el foco antes del clic. */
+    closeLookup(kind) {
+        this.state.lookups[kind] = [];
+    }
+    onLookupKeydown(kind, ev) {
+        if (ev.key === "Escape") {
+            this.closeLookup(kind);
+            ev.stopPropagation();
+        } else if (ev.key === "Enter" && this.state.lookups[kind].length === 1) {
+            ev.preventDefault();
+            this.pick(kind, this.state.lookups[kind][0], ev);
+        }
+    }
+    noop() {}
     pick(kind, record, ev) {
         this.state.lookups[kind] = [];
         this.state.labels[kind + "Query"] = "";

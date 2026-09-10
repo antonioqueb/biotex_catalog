@@ -429,6 +429,8 @@
     &--readonly { background: var(--bcw-surface-2); }
 }
 .o_bcw_multi_input { flex: 1 1 120px; min-width: 120px; border: 0; outline: none; background: transparent; font-size: 13px; padding: 4px 2px; color: var(--bcw-ink); }
+.o_bcw_multi_caret { margin-left: auto; color: var(--bcw-ink-2); font-size: 12px; padding: 0 2px; pointer-events: none; }
+.o_bcw_multi--readonly .o_bcw_multi_caret { display: none; }
 .o_bcw_modal .o_bcw_chip--sm { min-height: 26px; padding: 2px 4px 2px 8px; font-size: 12.5px; }
 .o_bcw_modal .o_bcw_chip_suggested { background: var(--bcw-brand-soft); color: #1d4ed8; }
 .o_bcw_modal .o_bcw_chip_suggested .fa-magic { font-size: 11px; opacity: .8; }
