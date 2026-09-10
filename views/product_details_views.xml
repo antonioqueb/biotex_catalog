@@ -26,9 +26,11 @@
             <xpath expr="//field[@name='biotex_characteristics']" position="attributes"><attribute name="placeholder">Material, esterilidad y características físicas.</attribute></xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="biotex_measurements" string="Medidas">
-                    <p>Agregue una línea por componente y tipo de medida. Por ejemplo: AGUJA / LARGO / 32 / MM, AGUJA / CALIBRE / 21 / G y CABLE / LARGO / 150 / CM.</p>
+                    <p>Agregue una línea por componente y atributo dimensional (catálogo Configuración → Atributos dimensionales). Por ejemplo: AGUJA / LARGO / 32 / MM, AGUJA / CALIBRE / 21 / GA y CABLE / LARGO / 150 / CM.</p>
                     <field name="biotex_measure_ids"><list editable="bottom">
-                        <field name="sequence" widget="handle"/><field name="component"/><field name="measure_type"/><field name="value"/><field name="unit"/>
+                        <field name="sequence" widget="handle"/><field name="component"/>
+                        <field name="measure_type_id" options="{'no_create': True}"/><field name="measure_type" column_invisible="1"/>
+                        <field name="value"/><field name="unit"/>
                     </list></field>
                     <group><field name="biotex_measure" string="Medidas anteriores (texto opcional)"/></group>
                 </page>

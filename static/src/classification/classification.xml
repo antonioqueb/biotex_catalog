@@ -443,14 +443,23 @@
 
             <!-- ============================================== medidas -->
             <section class="o_bcw_editor_block" aria-label="Medidas por componente">
-                <div class="o_bcw_editor_heading"><h5>Medidas por componente</h5><p>Opcionales, salvo que la familia las requiera. Ejemplos: largo de aguja, calibre y largo de cable.</p></div>
+                <div class="o_bcw_editor_heading"><h5>Medidas por componente</h5><p>Opcionales, salvo que la familia las requiera. Elige el atributo dimensional del catálogo (calibre, largo, volumen…) y captura valor y unidad.</p></div>
                 <div class="table-responsive">
-                    <table class="table table-sm o_bcw_rows"><thead><tr><th>Componente</th><th>Tipo</th><th>Valor</th><th>Unidad</th><th/></tr></thead><tbody>
+                    <table class="table table-sm o_bcw_rows"><thead><tr><th>Componente</th><th class="o_bcw_col_type">Atributo</th><th>Valor</th><th>Unidad</th><th/></tr></thead><tbody>
                         <tr t-foreach="state.draft.measure_data" t-as="row" t-key="row_index">
                             <td><input aria-label="Componente" class="o_bcw_input" placeholder="AGUJA" t-att-value="row.component" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'component', ev)"/></td>
-                            <td><input aria-label="Tipo de medida" class="o_bcw_input" placeholder="LARGO" t-att-value="row.measure_type" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'measure_type', ev)"/></td>
+                            <td>
+                                <select aria-label="Atributo dimensional" class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onRow('measure_data', row_index, 'measure_type_id', ev)">
+                                    <option value="" t-att-selected="!row.measure_type_id" t-esc="(!row.measure_type_id and row.measure_type) ? row.measure_type : '— Elige el atributo —'"/>
+                                    <option t-foreach="state.catalogs.measure_types" t-as="mt" t-key="mt.id" t-att-value="mt.id" t-att-title="mt.description"
+                                            t-att-selected="mt.id === row.measure_type_id" t-esc="mt.name"/>
+                                </select>
+                            </td>
                             <td><input aria-label="Valor" class="o_bcw_input" type="number" min="0" step="any" t-att-value="row.value" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'value', ev)"/></td>
-                            <td><input aria-label="Unidad de la medida" class="o_bcw_input" placeholder="MM / G / FR" t-att-value="row.unit" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'unit', ev)"/></td>
+                            <td>
+                                <input aria-label="Unidad de la medida" class="o_bcw_input" t-att-list="'bcw_units_' + row_index" t-att-placeholder="unitsFor(row).join(' / ') || 'MM / CM / ML'" t-att-value="row.unit" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('measure_data', row_index, 'unit', ev)"/>
+                                <datalist t-att-id="'bcw_units_' + row_index"><option t-foreach="unitsFor(row)" t-as="u" t-key="u" t-att-value="u"/></datalist>
+                            </td>
                             <td><button t-if="!props.readonly" class="btn btn-link" aria-label="Quitar medida" t-on-click="() => this.removeRow('measure_data', row_index)"><i class="fa fa-trash"/></button></td>
                         </tr>
                         <tr t-if="!state.draft.measure_data.length"><td colspan="5" class="o_bcw_help">Sin medidas estructuradas.</td></tr>
@@ -497,11 +506,12 @@
                                 <button t-if="!props.readonly" class="o_bcw_chip_x" aria-label="Cambiar fabricante" t-on-click="() => this.clearLookup('manufacturer')"><i class="fa fa-times"/></button>
                             </div>
                             <input t-else="" type="text" class="o_bcw_input" placeholder="Buscar fabricante..."
-                                   t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('manufacturer', ev)"/>
+                                   t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('manufacturer', ev)"
+                                   t-on-focus="(ev) => this.onLookup('manufacturer', ev)" t-on-blur="() => this.closeLookup('manufacturer')" t-on-keydown="(ev) => this.onLookupKeydown('manufacturer', ev)"/>
                             <button t-if="!props.readonly and !state.labels.manufacturer and state.labels.manufacturerQuery" class="btn btn-link btn-sm p-0 align-self-start" t-on-click="() => this.createRelation('manufacturer')">Crear en catálogo: <t t-esc="state.labels.manufacturerQuery"/></button>
                             <div class="o_bcw_lookup" t-if="state.lookups.manufacturer.length">
                                 <button t-foreach="state.lookups.manufacturer" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
-                                        t-on-click="() => this.pick('manufacturer', r)" t-esc="r.name"/>
+                                        t-on-pointerdown.prevent="noop" t-on-click="() => this.pick('manufacturer', r)" t-esc="r.name"/>
                             </div>
                             <small class="o_bcw_help" t-esc="state.manufacturerSuggested ? 'Sugerido por la marca, editable.' : 'Se sugiere a partir de la marca de la clasificación; puedes cambiarlo.'"/>
                         </div>
@@ -528,11 +538,12 @@
                                 <button t-if="!props.readonly" class="o_bcw_chip_x" aria-label="Cambiar distribuidor" t-on-click="() => this.clearLookup('distributor')"><i class="fa fa-times"/></button>
                             </div>
                             <input t-else="" type="text" class="o_bcw_input" placeholder="Buscar proveedor..."
-                                   t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('distributor', ev)"/>
+                                   t-att-readonly="props.readonly" t-on-input="(ev) => this.onLookup('distributor', ev)"
+                                   t-on-focus="(ev) => this.onLookup('distributor', ev)" t-on-blur="() => this.closeLookup('distributor')" t-on-keydown="(ev) => this.onLookupKeydown('distributor', ev)"/>
                             <button t-if="!props.readonly and !state.labels.distributor and state.labels.distributorQuery" class="btn btn-link btn-sm p-0 align-self-start" t-on-click="() => this.createRelation('distributor')">Crear en catálogo: <t t-esc="state.labels.distributorQuery"/></button>
                             <div class="o_bcw_lookup" t-if="state.lookups.distributor.length">
                                 <button t-foreach="state.lookups.distributor" t-as="r" t-key="r.id" class="o_bcw_lookup_item"
-                                        t-on-click="() => this.pick('distributor', r)" t-esc="r.name"/>
+                                        t-on-pointerdown.prevent="noop" t-on-click="() => this.pick('distributor', r)" t-esc="r.name"/>
                             </div>
                         </div>
                     </div>

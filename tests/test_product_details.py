@@ -72,6 +72,36 @@ class TestProductDetails(TransactionCase):
         p.with_user(self.operator).write({'biotex_presentation_ids':[Command.create({'uom_id':p.uom_id.id,'barcode':'AJUS-SINGLE'})]})
         self.assertIn('AJUS-SINGLE',p.product_variant_id.product_uom_ids.mapped('barcode'))
 
+    def test_measure_types_catalog_drives_product_measures(self):
+        Type = self.env['biotex.measure.type']
+        self.assertEqual(Type.search_count([]), 12, 'los 12 atributos dimensionales del esquema están cargados')
+        largo, calibre = self.env.ref('biotex_catalog.measure_type_lar'), self.env.ref('biotex_catalog.measure_type_cal')
+        self.assertEqual(largo._unit_list(), ['CM', 'MT', 'MM'])
+        self.assertEqual(self.env.ref('biotex_catalog.measure_type_geo')._unit_list(), [], 'ND no se ofrece como unidad')
+        self.assertEqual(self.env.ref('biotex_catalog.package_type_juego').code, 'JGO')
+        p = self.product()
+        # captura por atributo (formulario / asistente) y captura solo con texto (datos anteriores)
+        p.write({'biotex_measure_ids': [(0, 0, {'component': 'aguja', 'measure_type_id': largo.id, 'value': 32, 'unit': 'mm'}),
+                                        (0, 0, {'component': 'aguja', 'measure_type': 'calibre', 'value': 21, 'unit': 'GA'}),
+                                        (0, 0, {'component': 'cable', 'measure_type': 'longitud total', 'value': 150, 'unit': 'cm'})]})
+        rows = p.biotex_measure_ids.sorted('id')
+        self.assertEqual(rows[0].measure_type, 'LARGO')
+        self.assertEqual(rows[1].measure_type_id, calibre, 'un texto que coincide con el catálogo se enlaza solo')
+        self.assertFalse(rows[2].measure_type_id, 'un texto desconocido se conserva sin atributo')
+        self.assertEqual(rows[2].measure_type, 'LONGITUD TOTAL')
+        self.assertEqual(p.biotex_measure_summary, 'AGUJA LARGO 32 MM; AGUJA CALIBRE 21 GA; CABLE LONGITUD TOTAL 150 CM')
+        data = p.biotex_measure_ids._data()
+        self.assertEqual(data[0]['measure_type_id'], largo.id)
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            p.write({'biotex_measure_ids': [(0, 0, {'component': 'x', 'measure_type_id': largo.id, 'value': 0, 'unit': 'mm'})]})
+        # clasificador guiado: filas estructuradas con atributo
+        res = self.env['product.template'].with_user(self.operator).biotex_classifier_save(p.id, {
+            'biotex_name': 'aguja de prueba', 'measure_rows': [{'component': 'AGUJA', 'measure_type_id': calibre.id, 'value': 23, 'unit': 'GA'}]})
+        self.assertEqual(p.biotex_measure_ids.mapped('measure_type'), ['CALIBRE'])
+        self.assertEqual(p.biotex_measure_ids.measure_type_id, calibre)
+        queue = self.env['product.template'].biotex_classifier_queue([p.id])
+        self.assertEqual(queue[0]['measure_rows'][0]['measure_type_id'], calibre.id)
+
     def test_presentation_rows_carry_their_own_package_type(self):
         caja = self.env['biotex.package.type'].search([('name', '=ilike', 'caja')], limit=1) or self.env['biotex.package.type'].create({'name': 'Caja'})
         bolsa = self.env['biotex.package.type'].create({'name': 'Bolsa QA empaque'})

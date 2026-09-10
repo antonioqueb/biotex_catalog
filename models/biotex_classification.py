@@ -459,7 +459,7 @@ class BiotexClassificationSession(models.Model):
         if 'manufacturer_ref' in clean:
             clean['manufacturer_ref'] = (clean['manufacturer_ref'] or '').strip()
         if 'measure_data' in clean:
-            clean['measure_data'] = clean_measures(clean['measure_data'])
+            clean['measure_data'] = clean_measures(clean['measure_data'], self.env)
         if 'manufacturer_id' in clean:
             # Un valor elegido o vaciado por el usuario deja de recibir la sugerencia de la marca.
             suggested = self.brand_id.manufacturer_id.id or False
@@ -485,6 +485,8 @@ class BiotexClassificationSession(models.Model):
             'catalogs': {
                 'uoms': self.env['uom.uom'].search_read([], ['id', 'name'], order='sequence, id'),
                 'package_types': self.env['biotex.package.type'].search_read([], ['id', 'name'], order='sequence, name'),
+                'measure_types': [{'id': t.id, 'code': t.code, 'name': t.name, 'units': t._unit_list(), 'description': t.description or ''}
+                                  for t in self.env['biotex.measure.type'].search([])],
                 'countries': self.env['res.country'].search_read([], ['id', 'name'], order='name'),
                 'brands': self.env['biotex.brand'].search_read([], ['id', 'name', 'code'], order='name'),
                 'specialties': self.env['biotex.specialty'].search_read([], ['id', 'name', 'code'], order='name'),
@@ -800,7 +802,7 @@ class BiotexClassificationSessionLine(models.Model):
                      'biotex_description_extra':self.description_extra,'biotex_usage_notes':self.usage_notes,
                      'biotex_internal_notes':self.internal_notes,'biotex_compatibility_notes':self.compatibility_notes})
         if self.measure_data is not None and self.measure_data is not False:
-            vals['biotex_measure_ids'] = [(5,0,0)] + [(0,0,row) for row in clean_measures(self.measure_data)]
+            vals['biotex_measure_ids'] = [(5,0,0)] + [(0,0,row) for row in clean_measures(self.measure_data, self.env)]
         if self.barcode:
             vals['barcode'] = self.barcode
         elif not product.barcode and not product.biotex_reference and not self.manufacturer_ref:

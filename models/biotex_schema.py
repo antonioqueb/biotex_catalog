@@ -233,10 +233,53 @@ class BiotexPackageType(models.Model):
 
     name = fields.Char(required=True)
     code = fields.Char(size=8)
+    description = fields.Char(string='Descripción')
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
 
     _name_uniq = models.Constraint('unique(name)', 'Ya existe un tipo de empaque con ese nombre.')
+
+
+class BiotexMeasureType(models.Model):
+    """Atributo dimensional (hoja 09_DIM_ATRIBUTO_TIPO): calibre, diámetro, largo, ancho, volumen, altura...
+
+    Las medidas del producto ya no llevan el tipo como texto libre: eligen uno de estos atributos, con sus
+    unidades típicas como sugerencia. Siete vienen del bloque ATRIBUTO del esquema y cinco se propusieron
+    porque las medidas reales los exigen.
+    """
+    _name = 'biotex.measure.type'
+    _description = 'Atributo dimensional'
+    _order = 'sequence, name'
+
+    code = fields.Char(string='Clave', size=3, required=True, index=True)
+    name = fields.Char(string='Atributo', required=True)
+    description = fields.Char(string='Descripción')
+    typical_units = fields.Char(string='Unidades típicas', help='Separadas por coma; se ofrecen como sugerencia al capturar la medida.')
+    origin = fields.Selection([('schema', 'Esquema'), ('proposed', 'Propuesto')], string='Origen', default='schema', required=True)
+    sequence = fields.Integer(default=10)
+    active = fields.Boolean(default=True)
+
+    _code_uniq = models.Constraint('unique(code)', 'Ya existe un atributo dimensional con esa clave.')
+    _name_uniq = models.Constraint('unique(name)', 'Ya existe un atributo dimensional con ese nombre.')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        return super().create([{**v, **{k: (v[k] or '').strip().upper() for k in ('code', 'name') if k in v}} for v in vals_list])
+
+    def write(self, vals):
+        return super().write({**vals, **{k: (vals[k] or '').strip().upper() for k in ('code', 'name') if k in vals}})
+
+    def _unit_list(self):
+        self.ensure_one()
+        return [u.strip().upper() for u in (self.typical_units or '').split(',') if u.strip() and u.strip().upper() != 'ND']
+
+    @api.model
+    def _find_by_text(self, text):
+        """Atributo cuyo nombre o clave coincide con un texto libre (para medidas capturadas antes del catálogo)."""
+        text = (text or '').strip().upper()
+        if not text:
+            return self.browse()
+        return self.search(['|', ('name', '=ilike', text), ('code', '=ilike', text)], limit=1)
 
     @api.model
     def resolve(self, label):

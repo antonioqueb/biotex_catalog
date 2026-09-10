@@ -3,6 +3,7 @@ import re
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Domain
+from .product_details import clean_measures
 
 
 class ProductTemplate(models.Model):
@@ -298,6 +299,9 @@ class ProductTemplate(models.Model):
         """Punto de entrada del asistente OWL: guarda, sincroniza etiqueta y asigna clave en una sola llamada."""
         product = self.browse(product_id) if product_id else self.new({})
         clean = {k: v for k, v in vals.items() if k in self._fields}
+        if isinstance(vals.get('measure_rows'), list):
+            # medidas estructuradas del clasificador guiado: sustituyen las anteriores del producto
+            clean['biotex_measure_ids'] = [(5, 0, 0)] + [(0, 0, row) for row in clean_measures(vals['measure_rows'], self.env)]
         if clean.get('biotex_family_id'):
             clean['categ_id'] = clean['biotex_family_id']
         if not product_id and not clean.get('name'):
@@ -333,7 +337,7 @@ class ProductTemplate(models.Model):
         return {'clave': '%s%02d' % (prefix, counter._next(prefix)), 'generic': gprefix + '…'}
 
     @api.model
-    def biotex_classifier_queue(self, product_ids=None, limit=200):
+    def _biotex_classifier_queue_read(self, product_ids=None, limit=200):
         domain = [('id', 'in', product_ids)] if product_ids else [('biotex_class_state', '!=', 'complete')]
         products = self.search(domain, limit=limit, order='biotex_class_state, write_date')
         return products.read([
@@ -342,6 +346,14 @@ class ProductTemplate(models.Model):
             'biotex_reference', 'biotex_country_id', 'biotex_primary_distributor_id', 'biotex_usage_notes', 'biotex_equipment_ids',
             'biotex_main_equipment_id', 'biotex_specialty_ids', 'biotex_main_specialty_id', 'biotex_class_state', 'biotex_missing',
             'biotex_photo_count', 'image_128', 'description', 'biotex_legacy_code'])
+
+    @api.model
+    def biotex_classifier_queue(self, product_ids=None, limit=200):
+        rows = self._biotex_classifier_queue_read(product_ids, limit)
+        measures = {p.id: p.biotex_measure_ids._data() for p in self.browse([r['id'] for r in rows])}
+        for row in rows:
+            row['measure_rows'] = measures.get(row['id'], [])
+        return rows
 
     # ------------------------------------------------------------------ búsqueda por sinónimo / referencia / marca / genérico
     @api.model

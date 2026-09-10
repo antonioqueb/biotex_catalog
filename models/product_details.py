@@ -16,7 +16,12 @@ def normalized(value):
                            if not unicodedata.combining(c)).split())
 
 
-def clean_measures(rows):
+def clean_measures(rows, env=None):
+    """Normaliza las medidas capturadas: componente, atributo dimensional (del catálogo), valor y unidad.
+
+    El atributo llega como ``measure_type_id``; con ``env`` se resuelve a su nombre, que se conserva en
+    ``measure_type`` para las descripciones. Las medidas anteriores al catálogo pueden traer solo el texto.
+    """
     if not isinstance(rows, list):
         raise ValidationError('Las medidas deben ser una lista.')
     result = []
@@ -24,12 +29,26 @@ def clean_measures(rows):
         if not isinstance(row, dict):
             raise ValidationError('Medida no válida.')
         item = {k: upper(row.get(k) or '') for k in ('component', 'measure_type', 'unit')}
+        type_id = row.get('measure_type_id') or False
+        if type_id and env is not None:
+            measure_type = env['biotex.measure.type'].browse(int(type_id)).exists()
+            if not measure_type:
+                raise ValidationError('El atributo dimensional elegido ya no existe.')
+            item['measure_type_id'] = measure_type.id
+            item['measure_type'] = measure_type.name
+        elif type_id:
+            item['measure_type_id'] = int(type_id)
+        elif env is not None and item['measure_type']:
+            found = env['biotex.measure.type']._find_by_text(item['measure_type'])
+            if found:
+                item['measure_type_id'] = found.id
+                item['measure_type'] = found.name
         try:
             item['value'] = float(row.get('value', 0))
         except (ValueError, TypeError):
             raise ValidationError('El valor de la medida debe ser numérico.')
-        if not all(item.values()) or not math.isfinite(item['value']) or item['value'] <= 0:
-            raise ValidationError('Complete componente, tipo, valor positivo y unidad en cada medida.')
+        if not item['component'] or not item['measure_type'] or not item['unit'] or not math.isfinite(item['value']) or item['value'] <= 0:
+            raise ValidationError('Complete componente, atributo dimensional, valor positivo y unidad en cada medida.')
         item['sequence'] = (i + 1) * 10
         result.append(item)
     return result
@@ -44,16 +63,38 @@ class ProductMeasure(models.Model):
     company_id = fields.Many2one(related='product_tmpl_id.company_id', store=True)
     sequence = fields.Integer(default=10)
     component = fields.Char(string='Componente', required=True)
-    measure_type = fields.Char(string='Tipo de medida', required=True)
+    measure_type_id = fields.Many2one('biotex.measure.type', string='Atributo dimensional', ondelete='restrict', index=True)
+    measure_type = fields.Char(string='Tipo de medida', required=True,
+                               help='Nombre del atributo dimensional; se conserva como texto para armar las descripciones.')
     value = fields.Float(string='Valor', required=True, digits=(16, 6))
     unit = fields.Char(string='Unidad', required=True)
 
+    def _with_type(self, vals):
+        """El texto del tipo sigue al atributo elegido; un texto sin atributo intenta reconocerlo en el catálogo."""
+        vals = {**vals, **{k: upper(vals[k]) for k in ('component', 'measure_type', 'unit') if k in vals}}
+        if vals.get('measure_type_id'):
+            vals['measure_type'] = self.env['biotex.measure.type'].browse(vals['measure_type_id']).name
+        elif 'measure_type' in vals and 'measure_type_id' not in vals:
+            found = self.env['biotex.measure.type']._find_by_text(vals['measure_type'])
+            if found:
+                vals.update(measure_type_id=found.id, measure_type=found.name)
+        return vals
+
     @api.model_create_multi
     def create(self, vals_list):
-        return super().create([{**v, **{k: upper(v[k]) for k in ('component','measure_type','unit') if k in v}} for v in vals_list])
+        return super().create([self._with_type(v) for v in vals_list])
 
     def write(self, vals):
-        return super().write({**vals, **{k: upper(vals[k]) for k in ('component','measure_type','unit') if k in vals}})
+        return super().write(self._with_type(vals))
+
+    @api.onchange('measure_type_id')
+    def _onchange_measure_type_id(self):
+        for row in self:
+            if row.measure_type_id:
+                row.measure_type = row.measure_type_id.name
+                units = row.measure_type_id._unit_list()
+                if units and not row.unit:
+                    row.unit = units[0]
 
     @api.constrains('component','measure_type','value','unit')
     def _check_measure(self):
@@ -64,7 +105,8 @@ class ProductMeasure(models.Model):
         return '; '.join('%s %s %s %s' % (r.component, r.measure_type, '%g' % r.value, r.unit) for r in self)
 
     def _data(self):
-        return [{key: r[key] for key in ('component','measure_type','value','unit')} for r in self]
+        return [{'component': r.component, 'measure_type_id': r.measure_type_id.id or False, 'measure_type': r.measure_type,
+                 'value': r.value, 'unit': r.unit} for r in self]
 
 
 class ProductCodeHistory(models.Model):

@@ -46,7 +46,7 @@ export class BiotexLineEditorDialog extends Component {
         this.state = useState({
             loading: true,
             line: {},
-            catalogs: { uoms: [], package_types: [], countries: [], brands: [], specialties: [], contents: [] },
+            catalogs: { uoms: [], package_types: [], countries: [], brands: [], specialties: [], contents: [], measure_types: [] },
             classificationBrandId: false,
             classificationBrandName: "",
             draft: {},
@@ -234,13 +234,7 @@ export class BiotexLineEditorDialog extends Component {
         const query = ev.target.value;
         this.state.labels[kind + "Query"] = query;
         if (kind === "manufacturer") this.state.manufacturerSuggested = false;
-        // Los catálogos cortos (especialidad, país, equipo) se despliegan al enfocar, sin escribir nada;
-        // los contactos (fabricante, distribuidor) piden al menos dos letras porque la lista es larga.
-        const minimum = LOCAL_LOOKUPS.includes(kind) || kind === "equipment" ? 0 : 2;
-        if (query.length < minimum) {
-            this.state.lookups[kind] = [];
-            return;
-        }
+        // Todas las listas se despliegan al enfocar el campo, sin escribir nada, y se filtran desde la primera letra.
         if (LOCAL_LOOKUPS.includes(kind)) {
             // catálogos ya cargados: se filtran en el cliente
             const q = query.toLowerCase();
@@ -300,7 +294,14 @@ export class BiotexLineEditorDialog extends Component {
     }
     addRow(kind) {
         // Cada empacado lleva su propio tipo (caja, bolsa, estuche…), su cantidad de unidades indivisibles y su código.
-        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { package_type_id: false, name: "", quantity: 1, barcode: "" });
+        // Cada medida elige un atributo dimensional del catálogo (calibre, largo, volumen…) y su unidad.
+        this.state.draft[kind].push(kind === "measure_data"
+            ? { component: "", measure_type_id: false, measure_type: "", value: "", unit: "" }
+            : { package_type_id: false, name: "", quantity: 1, barcode: "" });
+    }
+    /** Unidades típicas del atributo elegido en la fila, para sugerirlas al capturar. */
+    unitsFor(row) {
+        return this.state.catalogs.measure_types.find((t) => t.id === row.measure_type_id)?.units || [];
     }
     /** Etiqueta de un empacado ya guardado sin tipo reconocido: se muestra su nombre de unidad tal cual. */
     rowTypeLabel(row) {
@@ -315,6 +316,13 @@ export class BiotexLineEditorDialog extends Component {
         if (field === "package_type_id") {
             row.package_type_id = parseInt(raw, 10) || false;
             if (row.package_type_id) row.name = "";  // el nombre de la unidad lo compone el servidor a partir del tipo
+            return;
+        }
+        if (field === "measure_type_id") {
+            row.measure_type_id = parseInt(raw, 10) || false;
+            const type = this.state.catalogs.measure_types.find((t) => t.id === row.measure_type_id);
+            row.measure_type = type ? type.name : "";
+            if (type && !row.unit && type.units.length) row.unit = type.units[0];  // primera unidad típica como sugerencia
             return;
         }
         row[field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
@@ -337,7 +345,7 @@ export class BiotexLineEditorDialog extends Component {
         if (!this.state.draft.uom_id) errors.uom_id = _t("Selecciona la unidad de medida.");
         const qty = this.state.draft.package_qty;
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
-        if (this.state.draft.measure_data.some((r) => !r.component.trim() || !r.measure_type.trim() || !r.unit.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, tipo, valor positivo y unidad en cada medida.");
+        if (this.state.draft.measure_data.some((r) => !r.component.trim() || !(r.measure_type_id || (r.measure_type || "").trim()) || !r.unit.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, atributo dimensional, valor positivo y unidad en cada medida.");
         const presentations = this.state.draft.presentation_data;
         if (presentations.some((r) => (!r.package_type_id && !(r.name || "").trim()) || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada empacado requiere tipo de empaque, cantidad entera positiva y un código de barras distinto.");
         this.state.errors = errors;

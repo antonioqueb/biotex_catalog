@@ -9,5 +9,7 @@
     <record id="package_type_frasco" model="biotex.package.type"><field name="name">Frasco</field><field name="code">FRA</field><field name="sequence">60</field></record>
     <record id="package_type_tubo" model="biotex.package.type"><field name="name">Tubo</field><field name="code">TUB</field><field name="sequence">70</field></record>
     <record id="package_type_ampolleta" model="biotex.package.type"><field name="name">Ampolleta</field><field name="code">AMP</field><field name="sequence">80</field></record>
+    <record id="package_type_juego" model="biotex.package.type"><field name="name">Juego</field><field name="code">JGO</field><field name="description">Juego o set de piezas.</field><field name="sequence">85</field></record>
+    <record id="package_type_unidad" model="biotex.package.type"><field name="name">Unidad</field><field name="code">UND</field><field name="description">Equipo o mobiliario que se entrega armado.</field><field name="sequence">90</field></record>
     <record id="package_type_otro" model="biotex.package.type"><field name="name">Otro</field><field name="code">OTR</field><field name="sequence">99</field></record>
 </odoo>

@@ -38,3 +38,6 @@ access_biotex_code_history_user,Product code history reader,model_biotex_product
 access_biotex_product_uom_classifier,Product packaging barcodes classifier,product.model_product_uom,biotex_catalog.group_catalog_classifier,1,1,1,1
 access_biotex_product_uom_direction,Product packaging barcodes direction,product.model_product_uom,biotex_base.group_biotex_direction,1,1,1,1
 access_biotex_product_merge_direction,Merge product duplicates direction,model_biotex_product_merge_wizard,biotex_base.group_biotex_direction,1,1,1,1
+access_biotex_measure_type_user,biotex.measure.type user,model_biotex_measure_type,base.group_user,1,0,0,0
+access_biotex_measure_type_classifier,biotex.measure.type classifier,model_biotex_measure_type,biotex_catalog.group_catalog_classifier,1,1,1,0
+access_biotex_measure_type_direction,biotex.measure.type direction,model_biotex_measure_type,biotex_base.group_biotex_direction,1,1,1,1

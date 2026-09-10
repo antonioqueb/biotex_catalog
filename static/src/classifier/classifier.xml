@@ -135,7 +135,32 @@
                         <div t-if="family and family.hint" class="alert alert-info py-2"><i class="fa fa-lightbulb-o me-1"/><t t-esc="family.hint"/></div>
                         <div class="row g-3" style="max-width: 980px;">
                             <div class="col-md-6"><label class="form-label fw-bold">Descripción *</label><input class="form-control" t-att-value="state.product.biotex_name" t-on-input="(ev) => this.onInput('biotex_name', ev)" placeholder="Electrodo de broche para ECG redondo autoadherible"/></div>
-                            <div class="col-md-3"><label class="form-label fw-bold">Medidas *</label><input class="form-control" t-att-value="state.product.biotex_measure" t-on-input="(ev) => this.onInput('biotex_measure', ev)" placeholder="36 mm x 44 mm"/></div>
+                            <div class="col-md-3"><label class="form-label fw-bold">Medidas (texto) <small class="text-muted fw-normal">si no usas atributos</small></label><input class="form-control" t-att-value="state.product.biotex_measure" t-on-input="(ev) => this.onInput('biotex_measure', ev)" placeholder="36 mm x 44 mm"/></div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Medidas por atributo dimensional *</label>
+                                <p class="text-muted small mb-2">Una fila por componente y atributo del catálogo (calibre, diámetro, largo, ancho, volumen…). La descripción final las incluye en este orden.</p>
+                                <table class="table table-sm align-middle mb-2" t-if="state.product.measure_rows.length">
+                                    <thead><tr><th>Componente</th><th>Atributo</th><th style="width: 120px">Valor</th><th style="width: 140px">Unidad</th><th style="width: 40px"/></tr></thead>
+                                    <tbody>
+                                        <tr t-foreach="state.product.measure_rows" t-as="row" t-key="row_index">
+                                            <td><input class="form-control form-control-sm" placeholder="AGUJA" t-att-value="row.component" t-on-input="(ev) => this.onMeasure(row_index, 'component', ev)"/></td>
+                                            <td>
+                                                <select class="form-select form-select-sm" t-on-change="(ev) => this.onMeasure(row_index, 'measure_type_id', ev)">
+                                                    <option value="" t-att-selected="!row.measure_type_id" t-esc="(!row.measure_type_id and row.measure_type) ? row.measure_type : '— Elige el atributo —'"/>
+                                                    <option t-foreach="state.measureTypes" t-as="mt" t-key="mt.id" t-att-value="mt.id" t-att-title="mt.description" t-att-selected="mt.id === row.measure_type_id" t-esc="mt.name"/>
+                                                </select>
+                                            </td>
+                                            <td><input type="number" min="0" step="any" class="form-control form-control-sm" t-att-value="row.value" t-on-input="(ev) => this.onMeasure(row_index, 'value', ev)"/></td>
+                                            <td>
+                                                <input class="form-control form-control-sm" t-att-list="'bcl_units_' + row_index" t-att-placeholder="unitsFor(row).join(' / ') || 'MM / CM'" t-att-value="row.unit" t-on-input="(ev) => this.onMeasure(row_index, 'unit', ev)"/>
+                                                <datalist t-att-id="'bcl_units_' + row_index"><option t-foreach="unitsFor(row)" t-as="u" t-key="u" t-att-value="u"/></datalist>
+                                            </td>
+                                            <td><button type="button" class="btn btn-link btn-sm text-danger" aria-label="Quitar medida" t-on-click="() => this.removeMeasure(row_index)"><i class="fa fa-trash"/></button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" t-on-click="addMeasure"><i class="fa fa-plus me-1"/>Agregar medida</button>
+                            </div>
                             <div class="col-md-3"><label class="form-label fw-bold">Unidad indivisible *</label><input class="form-control" t-att-value="state.product.biotex_content" t-on-input="(ev) => this.onInput('biotex_content', ev)" placeholder="Bolsa con 50"/></div>
                             <div class="col-md-3"><label class="form-label">Tipo de empaque</label><select class="form-select" t-on-change="(ev) => this.onSelect('biotex_package_type_id', ev)"><option value="">—</option><option t-foreach="state.packageTypes" t-as="pt" t-key="pt.id" t-att-value="pt.id" t-att-selected="pt.id === state.product.biotex_package_type_id" t-esc="pt.name"/></select></div>
                             <div class="col-md-3"><label class="form-label">Cantidad por presentación</label><input type="number" min="1" class="form-control" t-att-value="state.product.biotex_package_qty" t-on-input="(ev) => this.onInput('biotex_package_qty', ev)"/></div>
