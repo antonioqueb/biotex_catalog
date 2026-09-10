@@ -299,15 +299,12 @@ export class BiotexLineEditorDialog extends Component {
         this.state.multi[kind] = this.state.multi[kind].filter((x) => x.id !== id);
     }
     addRow(kind) {
-        // Un empacado nuevo cuenta en la unidad indivisible base; la cantidad se deduce de la descripción
-        // ("CAJA CON 12" → 12) mientras el usuario no la escriba a mano (`_auto`).
-        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { name: "", quantity: 1, barcode: "", _auto: true });
+        // Cada empacado lleva su propio tipo (caja, bolsa, estuche…), su cantidad de unidades indivisibles y su código.
+        this.state.draft[kind].push(kind === "measure_data" ? { component: "", measure_type: "", value: "", unit: "" } : { package_type_id: false, name: "", quantity: 1, barcode: "" });
     }
-    /** Primer entero de la descripción del empacado, o 1 si no trae número. */
-    static quantityFromName(name) {
-        const match = /\d+/.exec(name || "");
-        const value = match ? parseInt(match[0], 10) : 0;
-        return value >= 1 ? value : 1;
+    /** Etiqueta de un empacado ya guardado sin tipo reconocido: se muestra su nombre de unidad tal cual. */
+    rowTypeLabel(row) {
+        return row.package_type_id ? "" : (row.name || "");
     }
     removeRow(kind, index) {
         this.state.draft[kind].splice(index, 1);
@@ -315,11 +312,12 @@ export class BiotexLineEditorDialog extends Component {
     onRow(kind, index, field, ev) {
         const raw = ev.target.value;
         const row = this.state.draft[kind][index];
-        row[field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
-        if (kind === "presentation_data") {
-            if (field === "quantity") row._auto = false;
-            if (field === "name" && row._auto) row.quantity = BiotexLineEditorDialog.quantityFromName(row.name);
+        if (field === "package_type_id") {
+            row.package_type_id = parseInt(raw, 10) || false;
+            if (row.package_type_id) row.name = "";  // el nombre de la unidad lo compone el servidor a partir del tipo
+            return;
         }
+        row[field] = ["value", "quantity"].includes(field) ? (raw === "" ? "" : Number(raw)) : (field === "barcode" ? raw : raw.toUpperCase());
     }
     async createRelation(kind) {
         const name = (this.state.labels[kind + "Query"] || "").trim();
@@ -341,7 +339,7 @@ export class BiotexLineEditorDialog extends Component {
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
         if (this.state.draft.measure_data.some((r) => !r.component.trim() || !r.measure_type.trim() || !r.unit.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, tipo, valor positivo y unidad en cada medida.");
         const presentations = this.state.draft.presentation_data;
-        if (presentations.some((r) => !r.name.trim() || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada presentación requiere nombre, cantidad entera positiva y un código distinto.");
+        if (presentations.some((r) => (!r.package_type_id && !(r.name || "").trim()) || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada empacado requiere tipo de empaque, cantidad entera positiva y un código de barras distinto.");
         this.state.errors = errors;
         if (errors.package_qty) this.state.detailsOpen = true;
         return !Object.keys(errors).length;
@@ -354,7 +352,6 @@ export class BiotexLineEditorDialog extends Component {
         try {
             const vals = { ...this.state.draft };
             vals.package_qty = vals.package_qty === "" ? 1 : vals.package_qty;
-            vals.presentation_data = vals.presentation_data.map(({ _auto, ...row }) => row);
             if (!(vals.base_name || "").trim()) vals.base_name = vals.new_name;
             const session = await this.orm.call("biotex.classification.session", "workspace_update_line", [
                 [this.props.sessionId], this.props.lineId, vals,

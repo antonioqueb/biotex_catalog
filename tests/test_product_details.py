@@ -72,6 +72,26 @@ class TestProductDetails(TransactionCase):
         p.with_user(self.operator).write({'biotex_presentation_ids':[Command.create({'uom_id':p.uom_id.id,'barcode':'AJUS-SINGLE'})]})
         self.assertIn('AJUS-SINGLE',p.product_variant_id.product_uom_ids.mapped('barcode'))
 
+    def test_presentation_rows_carry_their_own_package_type(self):
+        caja = self.env['biotex.package.type'].search([('name', '=ilike', 'caja')], limit=1) or self.env['biotex.package.type'].create({'name': 'Caja'})
+        bolsa = self.env['biotex.package.type'].create({'name': 'Bolsa QA empaque'})
+        p = self.product()
+        p.with_user(self.operator)._biotex_set_presentations([
+            {'package_type_id': caja.id, 'quantity': 12, 'barcode': 'AJUS-TYPE-CAJA12'},
+            {'package_type_id': bolsa.id, 'quantity': 1, 'barcode': 'AJUS-TYPE-BOLSA'},
+            {'name': 'estuche antiguo', 'quantity': 2, 'barcode': 'AJUS-TYPE-LEGACY'}])
+        rows = {r.barcode: r for r in p.product_variant_id.product_uom_ids}
+        self.assertEqual(rows['AJUS-TYPE-CAJA12'].uom_id.name, 'CAJA CON 12')
+        self.assertEqual(rows['AJUS-TYPE-CAJA12'].biotex_package_type_id, caja)
+        self.assertEqual(rows['AJUS-TYPE-BOLSA'].uom_id.name, 'BOLSA QA EMPAQUE')
+        self.assertEqual(rows['AJUS-TYPE-LEGACY'].uom_id.name, 'ESTUCHE ANTIGUO')
+        data = {row['barcode']: row for row in p._biotex_presentation_data()}
+        self.assertEqual((data['AJUS-TYPE-CAJA12']['package_type_id'], data['AJUS-TYPE-CAJA12']['quantity']), (caja.id, 12))
+        self.assertEqual(data['AJUS-TYPE-BOLSA']['package_type_id'], bolsa.id)
+        self.assertFalse(data['AJUS-TYPE-LEGACY']['package_type_id'])
+        with self.assertRaisesRegex(ValidationError, 'tipo de empaque'), self.cr.savepoint():
+            p._biotex_set_presentations([{'package_type_id': False, 'name': '', 'quantity': 3, 'barcode': 'AJUS-TYPE-NONE'}])
+
     def test_barcode_collision_and_fractional_presentation_rejected(self):
         a,b=self.product(),self.product(barcode='AJUS-TAKEN')
         with self.assertRaises(ValidationError),self.cr.savepoint():

@@ -416,10 +416,16 @@
 
             <!-- ============================================== empacados y códigos -->
             <section class="o_bcw_editor_block" aria-label="Empacados de productos y códigos de barras">
-                <div class="o_bcw_editor_heading"><h5>Empacados de productos y códigos de barras</h5><p>Cada empacado conserva la clave del producto y se cuenta en la unidad indivisible de arriba. Captura la descripción y su código de barras.</p></div>
-                <div class="table-responsive"><table class="table table-sm o_bcw_rows"><thead><tr><th>Empacado</th><th>Cantidad<t t-if="baseUomName"> (<t t-esc="baseUomName"/>)</t></th><th>Código de barras</th><th/></tr></thead><tbody>
+                <div class="o_bcw_editor_heading"><h5>Empacados de productos y códigos de barras</h5><p>Un renglón por cada tipo de empaque: indica cuántas unidades indivisibles contiene y su código de barras.</p></div>
+                <div class="table-responsive"><table class="table table-sm o_bcw_rows"><thead><tr><th class="o_bcw_col_type">Tipo de empaque</th><th>Cantidad<t t-if="baseUomName"> (<t t-esc="baseUomName"/>)</t></th><th>Código de barras</th><th/></tr></thead><tbody>
                     <tr t-foreach="state.draft.presentation_data" t-as="row" t-key="row_index">
-                        <td><input aria-label="Empacado" class="o_bcw_input" placeholder="CAJA CON 12" t-att-value="row.name" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'name', ev)"/></td>
+                        <td>
+                            <select aria-label="Tipo de empaque" class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onRow('presentation_data', row_index, 'package_type_id', ev)">
+                                <option value="" t-att-selected="!row.package_type_id" t-esc="rowTypeLabel(row) || '— Elige el tipo —'"/>
+                                <option t-foreach="state.catalogs.package_types" t-as="pt" t-key="pt.id" t-att-value="pt.id"
+                                        t-att-selected="pt.id === row.package_type_id" t-esc="pt.name"/>
+                            </select>
+                        </td>
                         <td>
                             <div class="o_bcw_qty_unit">
                                 <input aria-label="Cantidad por empacado" class="o_bcw_input" type="number" min="1" step="1" t-att-value="row.quantity" t-att-readonly="props.readonly" t-on-input="(ev) => this.onRow('presentation_data', row_index, 'quantity', ev)"/>
@@ -627,22 +633,6 @@
                                 <datalist id="o_bcw_contents">
                                     <option t-foreach="state.catalogs.contents" t-as="c" t-key="c" t-att-value="c"/>
                                 </datalist>
-                            </div>
-                            <div class="o_bcw_field">
-                                <label class="o_bcw_label">Tipo de empaque</label>
-                                <select class="o_bcw_input" t-att-disabled="props.readonly" t-on-change="(ev) => this.onSelect('package_type_id', ev)">
-                                    <option value="" t-att-selected="!state.draft.package_type_id">—</option>
-                                    <option t-foreach="state.catalogs.package_types" t-as="pt" t-key="pt.id" t-att-value="pt.id"
-                                            t-att-selected="pt.id === state.draft.package_type_id" t-esc="pt.name"/>
-                                </select>
-                            </div>
-                            <div class="o_bcw_field">
-                                <label class="o_bcw_label">Cant. de presentación</label>
-                                <input type="number" min="0" step="1" class="o_bcw_input"
-                                       t-att-class="{ 'o_bcw_input--error': state.errors.package_qty }"
-                                       t-att-value="state.draft.package_qty" t-att-readonly="props.readonly"
-                                       t-on-input="(ev) => this.onNumber('package_qty', ev)"/>
-                                <small t-if="state.errors.package_qty" class="o_bcw_error" t-esc="state.errors.package_qty"/>
                             </div>
                         </div>
                     </details>

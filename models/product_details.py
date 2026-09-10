@@ -183,9 +183,17 @@ class ProductDetails(models.Model):
             Packaging.create({'product_id':self.product_variant_id.id,'uom_id':self.uom_id.id,'barcode':barcode,'company_id':self.company_id.id})
 
     def _biotex_presentation_data(self):
+        """Empacados del producto para el asistente: tipo de empaque, cantidad de unidades indivisibles y código."""
         self.ensure_one()
-        return [{'name':row.uom_id.name, 'quantity':row.uom_id._compute_quantity(1,self.uom_id,round=False),
-                 'barcode':row.barcode} for row in self.product_variant_id.product_uom_ids]
+        return [{'name': row.uom_id.name, 'quantity': row.uom_id._compute_quantity(1, self.uom_id, round=False),
+                 'barcode': row.barcode, 'package_type_id': row._biotex_package_type().id or False}
+                for row in self.product_variant_id.product_uom_ids]
+
+    @api.model
+    def _biotex_presentation_name(self, package_type, quantity):
+        """Nombre de la unidad de empaque: "CAJA CON 12" (o solo "CAJA" cuando contiene una unidad)."""
+        name = upper(package_type.name)
+        return '%s CON %d' % (name, quantity) if quantity > 1 else name
 
     def _biotex_set_presentations(self, rows):
         self.ensure_one()
@@ -193,14 +201,18 @@ class ProductDetails(models.Model):
         if not isinstance(rows,list) or len(self.product_variant_ids) != 1:
             raise UserError('Use un producto sin variantes y una lista de presentaciones.')
         prepared, seen = [], set()
+        PackageType = self.env['biotex.package.type']
         for row in rows:
-            name, barcode = upper(row.get('name') or ''), (row.get('barcode') or '').strip()
+            barcode = (row.get('barcode') or '').strip()
             try:
                 quantity = float(row.get('quantity',0))
             except (TypeError,ValueError):
                 raise ValidationError('La cantidad de presentación debe ser numérica.')
+            # El asistente manda el tipo de empaque por renglón; el nombre de la unidad se compone de él.
+            package_type = PackageType.browse(int(row['package_type_id'])).exists() if row.get('package_type_id') else PackageType
+            name = upper(row.get('name') or '') if not package_type else self._biotex_presentation_name(package_type, int(quantity) if math.isfinite(quantity) else 0)
             if not name or not barcode or not math.isfinite(quantity) or quantity < 1 or quantity != int(quantity):
-                raise ValidationError('Cada presentación requiere nombre, código y una cantidad entera de unidades indivisibles.')
+                raise ValidationError('Cada empacado requiere tipo de empaque, código y una cantidad entera de unidades indivisibles.')
             if barcode in seen:
                 raise ValidationError('El código de barras está repetido en las presentaciones.')
             seen.add(barcode)
@@ -209,16 +221,17 @@ class ProductDetails(models.Model):
             unit=self.env['uom.uom'].search(domain,limit=1)
             if not unit:
                 unit=self.env['uom.uom'].sudo().create({'name':name,'relative_uom_id':self.uom_id.id,'relative_factor':quantity})
-            prepared.append((unit,barcode))
+            prepared.append((unit, barcode, package_type))
         current = self.product_variant_id.product_uom_ids
         historical=set(self.biotex_code_history_ids.mapped('code'))
         current.filtered(lambda r:r.barcode not in seen and r.barcode not in historical).unlink()
-        for unit,barcode in prepared:
+        for unit, barcode, package_type in prepared:
             row=current.filtered(lambda r:r.barcode==barcode)
+            values = {'uom_id': unit.id, 'biotex_package_type_id': package_type.id or False}
             if row:
-                row.write({'uom_id':unit.id})
+                row.write(values)
             else:
-                self.env['product.uom'].create({'product_id':self.product_variant_id.id,'uom_id':unit.id,'barcode':barcode,'company_id':self.company_id.id})
+                self.env['product.uom'].create({'product_id':self.product_variant_id.id,'barcode':barcode,'company_id':self.company_id.id, **values})
             self.uom_ids = [Command.link(unit.id)]
 
     @api.model
@@ -271,6 +284,15 @@ class ProductPackagingBarcode(models.Model):
     _inherit='product.uom'
 
     biotex_quantity=fields.Float(string='Unidades indivisibles',compute='_compute_biotex_quantity')
+    biotex_package_type_id = fields.Many2one('biotex.package.type', string='Tipo de empaque', ondelete='set null')
+
+    def _biotex_package_type(self):
+        """Tipo de empaque del renglón; para empacados antiguos se deduce del nombre de la unidad (CAJA CON 12 → CAJA)."""
+        self.ensure_one()
+        if self.biotex_package_type_id:
+            return self.biotex_package_type_id
+        first = upper(self.uom_id.name or '').split(' CON ')[0].strip()
+        return self.env['biotex.package.type'].search([('name', '=ilike', first)], limit=1) if first else self.env['biotex.package.type']
 
     @api.depends('uom_id.factor','product_id.uom_id.factor')
     def _compute_biotex_quantity(self):
