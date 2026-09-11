@@ -118,6 +118,33 @@ class TestClassificationFlow(TransactionCase):
         self.assertEqual(product.default_code, line.reference)
         self.assertTrue(product.default_code.startswith(session.class_code + '-'))
 
+    # ------------------------------------------------------------ unidad con movimientos
+    def test_unit_of_a_product_with_stock_moves_is_kept_and_reported(self):
+        units = self.env['uom.uom'].search([('name', 'in', ('Units', 'Unidades', 'Unit'))], limit=1) or self.env.ref('uom.product_uom_unit')
+        other_uom = self.env['uom.uom'].search([('id', '!=', units.id)], limit=1)
+        product = self.product(uom_id=units.id, is_storable=True)
+        location = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1).lot_stock_id
+        self.env['stock.quant'].with_context(inventory_mode=True).create({
+            'product_id': product.product_variant_id.id, 'location_id': location.id, 'inventory_quantity': 5}).action_apply_inventory()
+        self.assertTrue(self.env['stock.move'].search_count([('product_id', '=', product.product_variant_id.id)]))
+        session = self.session()
+        session.workspace_add_products(product.ids)
+        line = session.line_ids
+        data = session._workspace_session()['lines'][0]
+        self.assertTrue(data['uom_locked'])
+        self.assertEqual(data['product_uom_name'], units.name)
+        # el modal y la tabla no permiten cambiar la unidad
+        with self.assertRaisesRegex(UserError, 'movimientos de inventario'):
+            session.workspace_update_line(line.id, {'new_name': line.new_name, 'uom_id': other_uom.id})
+        # una unidad distinta ya guardada en la línea no rompe la confirmación: se conserva y se avisa
+        line.write({'uom_id': other_uom.id})
+        preview = session.workspace_confirmation_preview()
+        self.assertEqual(preview['kept_uoms'][0]['kept'], units.name)
+        session.workspace_confirm(expected_revision=preview['revision'])
+        self.assertEqual(product.uom_id, units)
+        self.assertTrue(product.default_code)
+        self.assertTrue(product.message_ids.filtered(lambda m: 'Unidad indivisible conservada' in str(m.body)))
+
     # ------------------------------------------------------------ bloqueo entre sesiones
     def test_product_in_a_draft_session_is_marked_and_cannot_join_another_session(self):
         product = self.product()

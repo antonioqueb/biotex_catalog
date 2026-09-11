@@ -105,6 +105,18 @@ class BiotexClassificationSession(models.Model):
                     session.classifier_id.code, session.family_id.biotex_composite))
 
     # ------------------------------------------------------------------ consecutivos
+    @api.model
+    def _moved_template_ids(self, products):
+        """Plantillas con movimientos de inventario: su unidad indivisible no puede cambiar (regla de Odoo).
+
+        Una consulta agrupada para toda la sesión, en lugar de una por línea.
+        """
+        if not products:
+            return set()
+        variants = products.with_context(active_test=False).product_variant_ids
+        groups = self.env['stock.move'].sudo()._read_group([('product_id', 'in', variants.ids)], ['product_id'], ['__count'])
+        return {variant.product_tmpl_id.id for variant, _count in groups}
+
     def _classified_elsewhere(self, product):
         """Clave actual del producto si ya tiene clasificación completa distinta a la de esta sesión, o ''.
 
@@ -286,6 +298,7 @@ class BiotexClassificationSession(models.Model):
 
     def _workspace_session(self):
         self.ensure_one()
+        moved = self._moved_template_ids(self.line_ids.product_id)
         return {
             'id': self.id,
             'state': self.state,
@@ -295,7 +308,7 @@ class BiotexClassificationSession(models.Model):
             'family_id': self.family_id.id or False,
             'classifier_id': self.classifier_id.id or False,
             'brand_id': self.brand_id.id or False,
-            'lines': [line._workspace_line() for line in self.line_ids.sorted(lambda l: (l.sequence, l.id))],
+            'lines': [line._workspace_line(moved=moved) for line in self.line_ids.sorted(lambda l: (l.sequence, l.id))],
         }
 
     @api.model
@@ -467,6 +480,10 @@ class BiotexClassificationSession(models.Model):
             raise UserError('"%s" ya tiene clave %s: su nombre y su referencia se conservan. Edite los demás datos.' % (line.product_id.display_name, line.reference))
         if not effective('uom_id', line.uom_id.id):
             raise UserError('La unidad de medida es obligatoria.')
+        if 'uom_id' in clean and int(clean['uom_id']) != line.product_id.uom_id.id and line._uom_locked():
+            raise UserError('"%s" ya tiene movimientos de inventario con la unidad %s: esa unidad se conserva. '
+                            'Registra cajas, bolsas u otros empaques como empacados con su equivalencia.'
+                            % (line.product_id.display_name, line.product_id.uom_id.name))
         qty = effective('package_qty', line.package_qty)
         if qty is not None and qty != '' and float(qty) <= 0:
             raise UserError('La cantidad de presentación debe ser un número positivo.')
@@ -557,10 +574,13 @@ class BiotexClassificationSession(models.Model):
         self.check_access('read')
         self._check_editable()
         self._ensure_reservations()
-        changes = []
+        changes, kept_uoms = [], []
         version = [self.class_code, self.company_id.id]
+        moved = self._moved_template_ids(self.line_ids.product_id)
         for line in self.line_ids.sorted('id'):
             product = line.product_id
+            if line.uom_id and line.uom_id != product.uom_id and product.id in moved:
+                kept_uoms.append({'id': product.id, 'name': product.name, 'kept': product.uom_id.name, 'requested': line.uom_id.name})
             previous = product.default_code or ''
             if previous and previous != line.reference:
                 changes.append({'id': product.id, 'name': product.name, 'before': previous, 'after': line.reference,
@@ -569,7 +589,7 @@ class BiotexClassificationSession(models.Model):
                             product.name, product.uom_id.id, line._classification_description(product),
                             product.biotex_measure_ids._data(), product._biotex_presentation_data()])
         return {'revision': hashlib.sha256(json.dumps(version).encode()).hexdigest(),
-                'count': len(self.line_ids), 'changes': changes}
+                'count': len(self.line_ids), 'changes': changes, 'kept_uoms': kept_uoms}
 
     def workspace_confirm(self, expected_revision=None):
         self.ensure_one()
@@ -748,9 +768,19 @@ class BiotexClassificationSessionLine(models.Model):
         for line in self:
             line.display_name = line.new_name or line.product_id.name
 
-    def _workspace_line(self):
+    def _uom_locked(self, moved=None):
+        """True si el producto tiene movimientos de inventario: conserva su unidad indivisible."""
+        self.ensure_one()
+        if moved is None:
+            moved = self.session_id._moved_template_ids(self.product_id)
+        return self.product_id.id in moved
+
+    def _workspace_line(self, moved=None):
         self.ensure_one()
         return {
+            'uom_locked': self._uom_locked(moved),
+            'product_uom_id': self.product_id.uom_id.id or False,
+            'product_uom_name': self.product_id.uom_id.name or '',
             'id': self.id,
             'product_id': self.product_id.id,
             'sequence': self.sequence,
@@ -820,8 +850,12 @@ class BiotexClassificationSessionLine(models.Model):
             vals.update({'default_code': self.reference, 'biotex_consecutive': self.consecutive})
             if self.new_name and self.new_name != product.name:
                 vals['name'] = self.new_name
+        kept_uom = False
         if self.uom_id and self.uom_id != product.uom_id:
-            vals['uom_id'] = self.uom_id.id
+            if self._uom_locked():
+                kept_uom = True  # Odoo no permite cambiar la unidad con movimientos: se conserva y se deja constancia
+            else:
+                vals['uom_id'] = self.uom_id.id
         detail = {
             'biotex_measure': self.measure, 'biotex_content': self.content,
             'biotex_package_type_id': self.package_type_id.id, 'biotex_package_qty': self.package_qty or 1.0,
@@ -867,7 +901,9 @@ class BiotexClassificationSessionLine(models.Model):
             '<p>Referencia: %s → %s</p><p>Clasificación: %s → %s</p>'
             '<p>Responsable: %s · Fecha (UTC): %s</p>'
         ) % (session.name, previous_reference or 'Sin referencia', product.default_code or '',
-             previous_classification, current_classification, self.env.user.display_name, applied_on),
+             previous_classification, current_classification, self.env.user.display_name, applied_on)
+            + (Markup('<p>Unidad indivisible conservada (%s): el producto ya tiene movimientos de inventario; se solicitó %s.</p>')
+               % (product.uom_id.name, self.uom_id.name) if kept_uom else Markup('')),
             subtype_xmlid='mail.mt_note')
 
     def _classification_description(self, product):

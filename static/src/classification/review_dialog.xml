@@ -4,6 +4,13 @@
         <Dialog title="'Revisar y generar claves'" size="'lg'" contentClass="'o_bcw_modal o_bcw_review_modal'">
             <div class="o_bcw_modal_body">
                 <p class="mb-0">Se aplicarán los nombres, unidades y referencias de <strong t-esc="props.preview.count"/> productos. Se conservará su identidad y el historial de clasificación.</p>
+                <div t-if="props.preview.kept_uoms and props.preview.kept_uoms.length" class="alert alert-info mb-0" role="status">
+                    <i class="fa fa-lock me-2" aria-hidden="true"/>
+                    <strong t-esc="props.preview.kept_uoms.length"/> producto(s) conservan su unidad indivisible porque ya tienen movimientos de inventario:
+                    <ul class="mb-0 mt-1">
+                        <li t-foreach="props.preview.kept_uoms" t-as="k" t-key="k.id"><t t-esc="k.name"/>: se conserva <strong t-esc="k.kept"/> (se había indicado <t t-esc="k.requested"/>). Registra el empaque como empacado con su equivalencia.</li>
+                    </ul>
+                </div>
                 <t t-if="props.preview.changes.length">
                     <div class="alert alert-warning mb-0" role="alert">
                         <i class="fa fa-exclamation-triangle me-2" aria-hidden="true"/>
