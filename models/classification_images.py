@@ -105,7 +105,7 @@ class ClassificationLine(models.Model):
         source = (self if pending else self.product_id).with_context(bin_size=True)
         return source, pending
 
-    def _workspace_line(self):
+    def _workspace_line(self, moved=None):
         """Añade ``images`` (máximo 3) para la columna "Imagen" de la etapa 3.
 
         Se calcula aquí, en el mismo RPC que devuelve las líneas, para que la tabla no haga una
@@ -113,7 +113,7 @@ class ClassificationLine(models.Model):
         secundarias del catálogo) y, como respaldo, ``product.image`` cuando la instancia tiene
         eCommerce instalado. Un reemplazo pendiente en la línea se muestra en lugar de la foto actual.
         """
-        data = super()._workspace_line()
+        data = super()._workspace_line(moved=moved)
         images = []
         for name, label in GALLERY_LABELS.items():
             source, pending = self._photo_source(name)
