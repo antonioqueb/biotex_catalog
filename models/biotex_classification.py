@@ -293,8 +293,13 @@ class BiotexClassificationSession(models.Model):
             'session': session._workspace_session() if session else None,
             'drafts': [{
                 'id': draft.id, 'class_code': draft.class_code or '', 'line_count': draft.line_count,
-            } for draft in self.search([('state', '=', 'draft'), ('user_id', '=', self.env.uid), ('id', '!=', session.id)], limit=5)],
+            } for draft in self.search(self._workspace_draft_domain() + [('id', '!=', session.id)], limit=5)],
         }
+
+    @api.model
+    def _workspace_draft_domain(self):
+        """Borradores del usuario que este asistente lista y retoma (un módulo puede acotarlos por modalidad)."""
+        return [('state', '=', 'draft'), ('user_id', '=', self.env.uid)]
 
     def _workspace_session(self):
         self.ensure_one()
@@ -422,7 +427,7 @@ class BiotexClassificationSession(models.Model):
         """Acción "Clasificar con asistente" de la lista: agrega a la última sesión activa del usuario
         (o crea una vacía) y devuelve la URL para abrir el asistente en una pestaña nueva."""
         products = products.exists()
-        session = self.search([('state', '=', 'draft'), ('user_id', '=', self.env.uid)], order='write_date desc, id desc', limit=1)
+        session = self.search(self._workspace_draft_domain(), order='write_date desc, id desc', limit=1)
         if not session:
             session = self.create({})
         # Los productos con clave completa de otra clasificación no se agregan a ciegas: el asistente
@@ -504,7 +509,7 @@ class BiotexClassificationSession(models.Model):
             clean['measure_data'] = clean_measures(clean['measure_data'], self.env)
         if 'manufacturer_id' in clean:
             # Un valor elegido o vaciado por el usuario deja de recibir la sugerencia de la marca.
-            suggested = self.brand_id.manufacturer_id.id or False
+            suggested = line._target_brand().manufacturer_id.id or False
             if (clean['manufacturer_id'] or False) != suggested or line.manufacturer_manual:
                 clean['manufacturer_manual'] = True
         for many, single in (('country_ids', 'country_id'), ('equipment_ids', 'equipment_id'), ('specialty_ids', 'specialty_id')):
@@ -536,12 +541,12 @@ class BiotexClassificationSession(models.Model):
                 'contents': sorted({p['biotex_content'] for p in self.env['product.template'].search_read(
                     [('biotex_content', '!=', False)], ['biotex_content'], limit=500) if p['biotex_content']}),
             },
-            'classification_brand_id': self.brand_id.id or False,
-            'classification_brand_name': self.brand_id.display_name or '',
+            'classification_brand_id': line._target_brand().id or False,
+            'classification_brand_name': line._target_brand().display_name or '',
             # Fabricante sugerido: el registrado en la marca de la clasificación. El modal lo precarga
             # cuando la línea aún no tiene fabricante y el usuario puede cambiarlo.
-            'brand_manufacturer_id': self.brand_id.manufacturer_id.id or False,
-            'brand_manufacturer_name': self.brand_id.manufacturer_id.display_name or '',
+            'brand_manufacturer_id': line._target_brand().manufacturer_id.id or False,
+            'brand_manufacturer_name': line._target_brand().manufacturer_id.display_name or '',
         }
 
     @api.model
@@ -747,6 +752,11 @@ class BiotexClassificationSessionLine(models.Model):
             code = line.session_id.class_code
             line.reference = ('%s-' + CONSECUTIVE_FORMAT) % (code, line.consecutive) if code and line.consecutive else False
 
+    def _target_brand(self):
+        """Marca con la que se clasifica esta línea: la de la sesión (un módulo puede definirla por línea)."""
+        self.ensure_one()
+        return self.session_id.brand_id
+
     def _matches_session_identity(self):
         """True si el producto ya tiene clave válida y su clasificación es la misma que la de la sesión."""
         self.ensure_one()
@@ -754,7 +764,7 @@ class BiotexClassificationSessionLine(models.Model):
         if not session.complete or not self.env['biotex.product.sequence']._split_code(product.default_code):
             return False
         return (product.categ_id == session.family_id and product.biotex_classifier_id == session.classifier_id
-                and product.biotex_brand_id == session.brand_id)
+                and product.biotex_brand_id == self._target_brand())
 
     def _refresh_identity(self):
         """Recalcula si la línea conserva la identidad del producto (reclasificación de datos)."""
@@ -796,7 +806,7 @@ class BiotexClassificationSessionLine(models.Model):
             'reclassify_from': '' if self.state == 'applied' else self.session_id._classified_elsewhere(self.product_id),
             'reclassified': self.reclassified,
             'state': self.state,
-            'brand_name': self.session_id.brand_id.display_name or '',
+            'brand_name': self._target_brand().display_name or '',
             'measure': self.measure or '',
             'barcode': self.barcode or '',
             'detail_filled': sum(1 for f in self.DETAIL_FIELDS if self[f]),
@@ -841,10 +851,11 @@ class BiotexClassificationSessionLine(models.Model):
         previous_reference = product.default_code or ''
         previous_classification = self._classification_description(product)
         reclassified = bool(session._classified_elsewhere(product))
+        brand = self._target_brand()
         vals = {
             'categ_id': session.family_id.id,
             'biotex_classifier_id': session.classifier_id.id,
-            'biotex_brand_id': session.brand_id.id,
+            'biotex_brand_id': brand.id,
         }
         if not self.preserve_reference:
             vals.update({'default_code': self.reference, 'biotex_consecutive': self.consecutive})
@@ -859,7 +870,7 @@ class BiotexClassificationSessionLine(models.Model):
         detail = {
             'biotex_measure': self.measure, 'biotex_content': self.content,
             'biotex_package_type_id': self.package_type_id.id, 'biotex_package_qty': self.package_qty or 1.0,
-            'biotex_brand_id': session.brand_id.id,
+            'biotex_brand_id': brand.id,
             'biotex_reference': self.manufacturer_ref, 'biotex_model': self.model,
             'biotex_country_id': self.country_id.id, 'biotex_manufacturer_id': self.manufacturer_id.id,
             'biotex_primary_distributor_id': self.distributor_id.id, 'biotex_characteristics': self.notes,
