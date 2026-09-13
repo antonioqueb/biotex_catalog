@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_biotex_classifier" model="ir.actions.client">
-        <field name="name">Clasificador Global</field>
+        <field name="name">Clasificador por Grupos</field>
         <field name="tag">biotex_catalog.classification_workspace</field>
     </record>
 </odoo>
