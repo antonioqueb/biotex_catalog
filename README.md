@@ -11,9 +11,9 @@ Grupo > familia > clave, descripción estructurada, marcas, fotos, estado de cla
 1. Clonar dentro del `addons_path` del servidor Odoo 19 junto con los demás módulos `biotex_*`.
 2. Actualizar lista de aplicaciones e instalar `biotex_catalog`.
 
-## Asistente de clasificación (clasificación masiva)
+## Clasificador Global (clasificación masiva, antes "Asistente de clasificación")
 
-Menú **Catálogo > Asistente de clasificación**. Pantalla OWL de tres etapas para procesar
+Menú **Catálogo > Clasificador Global**. Pantalla OWL de tres etapas para procesar
 muchos productos con una misma clasificación:
 
 1. **Selecciona clasificación** — grupo, familia, clasificador y marca, en cascada: cada nivel

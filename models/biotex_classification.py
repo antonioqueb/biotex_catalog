@@ -188,7 +188,7 @@ class BiotexClassificationSession(models.Model):
         return {
             'type': 'ir.actions.client',
             'tag': 'biotex_catalog.classification_workspace',
-            'name': 'Asistente de clasificación',
+            'name': 'Clasificador Global',
             'context': {'biotex_session_id': self.id},
         }
 

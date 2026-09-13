@@ -7,7 +7,7 @@
         <!-- ================================================== encabezado -->
         <header class="o_bcw_top">
             <div class="o_bcw_top_titles">
-                <h1>Asistente de clasificación</h1>
+                <h1>Clasificador Global</h1>
                 <p>Clasifica productos de forma rápida y ordenada</p>
             </div>
             <div class="o_bcw_top_actions">
