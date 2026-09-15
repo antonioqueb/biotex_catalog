@@ -251,7 +251,7 @@ class ProductTemplate(models.Model):
                 counter._observe_codes([p.default_code])
                 continue
             n = counter._next(prefix, reserve=True)
-            vals = {'default_code': '%s%02d' % (prefix, n), 'biotex_consecutive': n}
+            vals = {'default_code': '%s%02d' % (prefix, n), 'biotex_consecutive': n, **p._biotex_classified_vals()}
             if not p.barcode and not p.biotex_reference:
                 vals['barcode'] = vals['default_code']
             if p.biotex_name and not p.name:
@@ -260,6 +260,16 @@ class ProductTemplate(models.Model):
                 vals['biotex_generic_id'] = self.env['biotex.generic'].find_or_create(p.categ_id, p.biotex_classifier_id, p.biotex_name, p.biotex_measure).id
             p.write(vals)
         return True
+
+    # --- quién clasificó: se registra al aplicar una sesión del asistente o al asignar la clave individual ---
+    biotex_classified_by_id = fields.Many2one(
+        'res.users', string='Clasificado por', readonly=True, copy=False, index=True, ondelete='set null',
+        help='Usuario que aplicó la clasificación de este producto (sesión del asistente o asignación individual de clave).')
+    biotex_classified_on = fields.Datetime(string='Fecha de clasificación', readonly=True, copy=False)
+
+    def _biotex_classified_vals(self, when=None):
+        """Valores de auditoría de clasificación para escribir junto con la clave."""
+        return {'biotex_classified_by_id': self.env.uid, 'biotex_classified_on': when or fields.Datetime.now()}
 
     # --- sesión de clasificación en curso (asistente masivo) ---
     biotex_classification_line_ids = fields.One2many('biotex.classification.session.line', 'product_id', string='Líneas de clasificación')

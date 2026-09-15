@@ -895,10 +895,11 @@ class BiotexClassificationSessionLine(models.Model):
             specialties = self.specialty_id | self.specialty_ids
             vals['biotex_main_specialty_id'] = (self.specialty_id or specialties[:1]).id
             vals['biotex_specialty_ids'] = [(4, sp.id) for sp in specialties]
+        applied_on = fields.Datetime.now()
+        vals.update(product._biotex_classified_vals(applied_on))  # "Clasificado por": quien aplica la sesión
         product.write(vals)
         if self.presentation_data is not None and self.presentation_data is not False:
             product._biotex_set_presentations(self.presentation_data)
-        applied_on = fields.Datetime.now()
         current_classification = self._classification_description(product)
         super(BiotexClassificationSessionLine, self).write({
             'state': 'applied', 'reclassified': reclassified, 'applied_reference_before': previous_reference,

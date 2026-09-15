@@ -36,6 +36,8 @@
                             <field name="biotex_generic_id"/>
                             <field name="biotex_subclass_id" invisible="biotex_group_id.code != 'MT'" options="{'no_create': True}"/>
                             <field name="biotex_regulated"/>
+                            <field name="biotex_classified_by_id" invisible="not biotex_classified_by_id"/>
+                            <field name="biotex_classified_on" invisible="not biotex_classified_by_id"/>
                         </group>
                         <group string="Descripción estructurada">
                             <field name="biotex_name"/>
@@ -106,6 +108,8 @@
                 <field name="biotex_generic_id" optional="hide"/>
                 <field name="biotex_class_state" widget="biotex_class_badge" optional="show"/>
                 <field name="biotex_classification_status" widget="badge" decoration-warning="biotex_classification_status == 'classifying'" optional="show"/>
+                <field name="biotex_classified_by_id" optional="show" widget="many2one_avatar_user"/>
+                <field name="biotex_classified_on" optional="hide"/>
                 <field name="biotex_classification_session_id" optional="hide"/>
                 <field name="biotex_missing" optional="hide"/>
             </field>
@@ -126,12 +130,14 @@
                 <field name="biotex_equipment_ids"/>
                 <field name="biotex_specialty_ids"/>
                 <field name="biotex_legacy_code"/>
+                <field name="biotex_classified_by_id"/>
             </field>
             <xpath expr="//filter[@name='filter_to_sell']" position="before">
                 <filter name="biotex_unclassified" string="Sin clasificar" domain="[('biotex_class_state', '=', 'unclassified')]"/>
                 <filter name="biotex_no_photo" string="Sin foto" domain="[('biotex_class_state', '=', 'no_photo')]"/>
                 <filter name="biotex_complete" string="Completos" domain="[('biotex_class_state', '=', 'complete')]"/>
                 <filter name="biotex_classifying" string="En clasificación" domain="[('biotex_classification_status', '=', 'classifying')]"/>
+                <filter name="biotex_classified_by_me" string="Clasificados por mí" domain="[('biotex_classified_by_id', '=', uid)]"/>
                 <separator/>
                 <filter name="biotex_regulated" string="Regulados COFEPRIS" domain="[('biotex_regulated', '=', True)]"/>
                 <separator/>
@@ -143,6 +149,7 @@
                 <filter name="group_biotex_brand" string="Marca" context="{'group_by': 'biotex_brand_id'}"/>
                 <filter name="group_biotex_generic" string="Genérico" context="{'group_by': 'biotex_generic_id'}"/>
                 <filter name="group_biotex_state" string="Clasificación" context="{'group_by': 'biotex_class_state'}"/>
+                <filter name="group_biotex_classified_by" string="Clasificado por" context="{'group_by': 'biotex_classified_by_id'}"/>
             </xpath>
         </field>
     </record>

@@ -54,6 +54,23 @@ class TestClassificationFlow(TransactionCase):
         self.assertEqual(counter._split_code(legacy), ('%s-FLOW-TFL-%s' % (self.group.code, self.classifier.code), 7), 'las claves anteriores siguen reconociéndose')
         self.assertEqual(counter._split_code(self.prefix + '-12'), (self.prefix, 12))
 
+    def test_classified_by_is_recorded_on_apply_and_on_assign_clave(self):
+        """Agrupación "Clasificado por": el usuario que aplica la sesión o asigna la clave queda en el producto."""
+        session = self.session(user=self.colleague)
+        product = self.product(categ_id=self.family.id, biotex_classifier_id=self.classifier.id, biotex_brand_id=self.brand.id)
+        self.assertFalse(product.biotex_classified_by_id)
+        session.workspace_add_products(product.ids)
+        self.confirm(session)
+        self.assertEqual(product.biotex_classified_by_id, self.colleague)
+        self.assertTrue(product.biotex_classified_on)
+        single = self.product(categ_id=self.family.id, biotex_classifier_id=self.classifier.id, biotex_brand_id=self.brand.id)
+        single.with_user(self.operator).action_assign_clave()
+        self.assertTrue(single.default_code)
+        self.assertEqual(single.biotex_classified_by_id, self.operator)
+        groups = self.env['product.template'].read_group(
+            [('id', 'in', (product | single).ids)], ['id:count'], ['biotex_classified_by_id'])
+        self.assertEqual({g['biotex_classified_by_id'][0] for g in groups}, {self.colleague.id, self.operator.id}, 'se puede agrupar por clasificador')
+
     # ------------------------------------------------------------ reclasificación
     def test_reclassifying_a_classified_product_keeps_reference_and_names(self):
         product = self.classified_product(self.prefix + '-05', name='PRODUCTO YA CLASIFICADO')
