@@ -6,3 +6,4 @@ from . import test_classifier_navigation
 from . import test_product_details
 from . import test_classification_images
 from . import test_classification_flow
+from . import test_product_presentation
