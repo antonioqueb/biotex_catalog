@@ -380,7 +380,8 @@ export class BiotexLineEditorDialog extends Component {
         if (qty !== "" && qty !== false && (isNaN(qty) || qty <= 0)) errors.package_qty = _t("Debe ser un número mayor que cero.");
         if (this.state.draft.measure_data.some((r) => !r.component.trim() || !(r.measure_type_id || (r.measure_type || "").trim()) || !(r.unit_uom_id || (r.unit || "").trim()) || !Number.isFinite(Number(r.value)) || Number(r.value) <= 0)) errors.measure_data = _t("Completa componente, atributo dimensional, valor positivo y unidad en cada medida.");
         const presentations = this.state.draft.presentation_data;
-        if (presentations.some((r) => (!r.package_type_id && !(r.name || "").trim()) || !r.barcode.trim() || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(presentations.map((r) => r.barcode)).size !== presentations.length) errors.presentation_data = _t("Cada empacado requiere tipo de empaque, cantidad entera positiva y un código de barras distinto.");
+        const barcodes = presentations.map((r) => (r.barcode || "").trim()).filter(Boolean);  // opcional; si se captura, no se repite
+        if (presentations.some((r) => (!r.package_type_id && !(r.name || "").trim()) || !Number.isInteger(Number(r.quantity)) || Number(r.quantity) < 1) || new Set(barcodes).size !== barcodes.length) errors.presentation_data = _t("Cada empacado requiere tipo de empaque y cantidad entera positiva; el código de barras es opcional y no puede repetirse.");
         this.state.errors = errors;
         if (errors.package_qty) this.state.detailsOpen = true;
         if (Object.keys(errors).length) this.scrollToFirstError();

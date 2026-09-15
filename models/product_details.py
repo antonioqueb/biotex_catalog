@@ -181,11 +181,26 @@ class ProductDetails(models.Model):
             product.biotex_presentation_ids=product.product_variant_id.product_uom_ids if len(product.product_variant_ids)==1 else self.env['product.uom']
 
     def _inverse_presentations(self):
+        """Las presentaciones viven en la única variante del producto.
+
+        En el alta inicial ``BaseModel.create`` aplica este inverso antes de que ``product.template``
+        genere la variante (``product_variant_ids`` vacío): ese caso no es un error, ``create`` vuelve a
+        aplicar los renglones cuando la variante ya existe. Solo un producto con varias variantes por
+        atributos rechaza presentaciones a nivel plantilla (``biotex_skip_presentation_check`` en el
+        contexto lo omite para scripts de importación o sincronización).
+        """
         for product in self:
-            if len(product.product_variant_ids)!=1:
-                raise UserError('Capture las presentaciones en un producto sin variantes.')
-            product.product_variant_id.product_uom_ids=product.biotex_presentation_ids
-            product.uom_ids=[Command.link(unit.id) for unit in product.biotex_presentation_ids.uom_id]
+            variants = product.product_variant_ids
+            if not variants:
+                continue  # alta inicial: la variante se crea después; ver create()
+            if len(variants) != 1:
+                if self.env.context.get('biotex_skip_presentation_check'):
+                    continue
+                raise UserError('El producto "%s" tiene %d variantes por atributos. Las presentaciones (unidades comerciales '
+                                'con equivalencia) solo aplican a productos sin variantes: elimine los atributos o registre '
+                                'las presentaciones en la variante específica.' % (product.display_name, len(variants)))
+            variants.product_uom_ids = product.biotex_presentation_ids
+            product.uom_ids = [Command.link(unit.id) for unit in product.biotex_presentation_ids.uom_id]
 
     @api.depends('biotex_measure_ids.component','biotex_measure_ids.measure_type','biotex_measure_ids.value','biotex_measure_ids.unit','biotex_measure_ids.sequence')
     def _compute_measure_summary(self):
@@ -224,7 +239,16 @@ class ProductDetails(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        return super().create([{**v, **{k:upper(v[k]) for k in self._UPPER_FIELDS if k in v}} for v in vals_list])
+        # Las presentaciones se aplican una vez creada la variante: el inverso del campo calculado corre dentro
+        # de BaseModel.create, cuando product_variant_ids todavía está vacío (el formulario manda el campo aunque
+        # el usuario no lo toque, porque su valor calculado en el onchange se envía al guardar).
+        vals_list = [dict(v) for v in vals_list]
+        presentations = [v.pop('biotex_presentation_ids', None) for v in vals_list]
+        products = super().create([{**v, **{k:upper(v[k]) for k in self._UPPER_FIELDS if k in v}} for v in vals_list])
+        for product, commands in zip(products, presentations):
+            if commands:
+                product.write({'biotex_presentation_ids': commands})
+        return products
 
     def write(self, vals):
         previous={p.id:(p.default_code,p.barcode) for p in self} if 'default_code' in vals else {}
@@ -272,7 +296,7 @@ class ProductDetails(models.Model):
         prepared, seen = [], set()
         PackageType = self.env['biotex.package.type']
         for row in rows:
-            barcode = (row.get('barcode') or '').strip()
+            barcode = (row.get('barcode') or '').strip()  # opcional: se completa cuando se conoce el EAN real
             try:
                 quantity = float(row.get('quantity',0))
             except (TypeError,ValueError):
@@ -280,11 +304,12 @@ class ProductDetails(models.Model):
             # El asistente manda el tipo de empaque por renglón; el nombre de la unidad se compone de él.
             package_type = PackageType.browse(int(row['package_type_id'])).exists() if row.get('package_type_id') else PackageType
             name = upper(row.get('name') or '') if not package_type else self._biotex_presentation_name(package_type, int(quantity) if math.isfinite(quantity) else 0)
-            if not name or not barcode or not math.isfinite(quantity) or quantity < 1 or quantity != int(quantity):
-                raise ValidationError('Cada empacado requiere tipo de empaque, código y una cantidad entera de unidades indivisibles.')
-            if barcode in seen:
+            if not name or not math.isfinite(quantity) or quantity < 1 or quantity != int(quantity):
+                raise ValidationError('Cada empacado requiere tipo de empaque y una cantidad entera de unidades indivisibles.')
+            if barcode and barcode in seen:
                 raise ValidationError('El código de barras está repetido en las presentaciones.')
-            seen.add(barcode)
+            if barcode:
+                seen.add(barcode)
             # Only create a unit; never alter a conversion already used in operations.
             domain=[('name','=',name),('relative_uom_id','=',self.uom_id.id),('relative_factor','=',quantity)]
             unit=self.env['uom.uom'].search(domain,limit=1)
@@ -293,15 +318,23 @@ class ProductDetails(models.Model):
             prepared.append((unit, barcode, package_type))
         current = self.product_variant_id.product_uom_ids
         historical=set(self.biotex_code_history_ids.mapped('code'))
-        current.filtered(lambda r:r.barcode not in seen and r.barcode not in historical).unlink()
+        # Un renglón con código se reconoce por su código; uno sin código, por su unidad (se conserva el registro).
+        matched = self.env['product.uom']
+        plan = []
         for unit, barcode, package_type in prepared:
-            row=current.filtered(lambda r:r.barcode==barcode)
-            values = {'uom_id': unit.id, 'biotex_package_type_id': package_type.id or False}
+            if barcode:
+                row = current.filtered(lambda r: r.barcode == barcode)[:1]
+            else:
+                row = (current - matched).filtered(lambda r: not r.barcode and r.uom_id == unit)[:1]
+            matched |= row
+            plan.append((row, {'uom_id': unit.id, 'biotex_package_type_id': package_type.id or False, 'barcode': barcode or False}))
+        (current - matched).filtered(lambda r: not r.barcode or r.barcode not in historical).unlink()
+        for row, values in plan:
             if row:
                 row.write(values)
             else:
-                self.env['product.uom'].create({'product_id':self.product_variant_id.id,'barcode':barcode,'company_id':self.company_id.id, **values})
-            self.uom_ids = [Command.link(unit.id)]
+                self.env['product.uom'].create({'product_id':self.product_variant_id.id,'company_id':self.company_id.id, **values})
+            self.uom_ids = [Command.link(values['uom_id'])]
 
     @api.model
     def _search_display_name(self, operator, value):
@@ -352,6 +385,10 @@ class ProductVariantDetails(models.Model):
 class ProductPackagingBarcode(models.Model):
     _inherit='product.uom'
 
+    # El core lo declara obligatorio; aquí una presentación puede existir sin código hasta conocer el EAN real.
+    # La restricción SQL unique(barcode) del core sigue vigente y admite varios valores vacíos (NULL).
+    barcode = fields.Char(required=False, help='Código de barras único de esta presentación. Opcional al crear; '
+                                                'puede completarse cuando se conozca el EAN real.')
     biotex_quantity=fields.Float(string='Unidades indivisibles',compute='_compute_biotex_quantity')
     biotex_package_type_id = fields.Many2one('biotex.package.type', string='Tipo de empaque', ondelete='set null')
 
