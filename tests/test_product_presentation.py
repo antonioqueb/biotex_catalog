@@ -44,7 +44,7 @@ class TestProductPresentation(TransactionCase):
         """El rodeo que usaban los operadores (guardar y luego capturar) sigue funcionando, con y sin código."""
         tmpl = self.env['product.template'].create({'name': 'Dos pasos', 'uom_id': self.unit.id})
         tmpl.write({'biotex_presentation_ids': [self.presentation(barcode='EAN-TEST-001'), self.presentation()]})
-        self.assertEqual(sorted(tmpl.biotex_presentation_ids.mapped('barcode')), [False, 'EAN-TEST-001'])
+        self.assertEqual(sorted(tmpl.biotex_presentation_ids.mapped('barcode'), key=str), [False, 'EAN-TEST-001'])
         self.assertEqual(tmpl.product_variant_id.product_uom_ids, tmpl.biotex_presentation_ids)
 
     def test_presentation_blocked_on_multi_variant_template(self):
