@@ -361,8 +361,11 @@ class ProductVariantDetails(models.Model):
     def _check_biotex_unique_code(self):
         super()._check_biotex_unique_code()
         for p in self:
+            counter = self.env['biotex.product.sequence']
+            parts = counter._split_code(p.default_code)
+            history_domain = counter._history_after_reset_domain(parts[0]) if parts else []
             if p.default_code and self.env['biotex.product.code.history'].sudo().search_count([
-                ('code','=',p.default_code),('product_tmpl_id','!=',p.product_tmpl_id.id)],limit=1):
+                ('code','=',p.default_code),('product_tmpl_id','!=',p.product_tmpl_id.id)] + history_domain,limit=1):
                 raise ValidationError('Esa clave pertenece al historial de otro producto y no puede reutilizarse.')
 
     @api.model

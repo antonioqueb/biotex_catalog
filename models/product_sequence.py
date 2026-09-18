@@ -1,4 +1,5 @@
 """One durable, transactionally allocated counter per catalog prefix."""
+import json
 import re
 
 from odoo import api, fields, models
@@ -47,6 +48,39 @@ class BiotexProductSequence(models.Model):
         return prefix
 
     @api.model
+    def _reset_boundary(self, prefix):
+        """An operator may explicitly retire old reservations, without deleting audit rows.
+
+        No boundary means the original never-reuse policy. IDs, rather than dates,
+        distinguish the saved history from later writes (including reused codes).
+        The maintenance operation must lock writers before recording these IDs.
+        """
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            'biotex_catalog.sequence_reset_boundary.' + prefix)
+        if not raw:
+            return None
+        try:
+            boundary = json.loads(raw)
+            if not isinstance(boundary, dict) or any(
+                    type(boundary.get(key)) is not int or boundary[key] < 0
+                    for key in ('history_id', 'line_id')):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise UserError('La configuración del reinicio de %s no es válida.' % prefix)
+        return boundary
+
+    @api.model
+    def _reservation_after_reset_domain(self, prefix):
+        boundary = self._reset_boundary(prefix)
+        # An old session reopened in draft owns its reservations again.
+        return ['|', ('id', '>', boundary['line_id']), ('session_id.state', '=', 'draft')] if boundary else []
+
+    @api.model
+    def _history_after_reset_domain(self, prefix):
+        boundary = self._reset_boundary(prefix)
+        return [('id', '>', boundary['history_id'])] if boundary else []
+
+    @api.model
     def _observed_max(self, prefix):
         """Read actual suffixes, including archived/restricted products and old reservations.
 
@@ -61,6 +95,7 @@ class BiotexProductSequence(models.Model):
             'consecutive', 'reference', 'old_reference', 'applied_reference_before', 'applied_reference_after'])
         self.env['biotex.product.code.history'].flush_model(['prefix','consecutive'])
         pattern = '^' + re.escape(prefix) + r'-([0-9]+)$'
+        boundary = self._reset_boundary(prefix)
         self.env.cr.execute('''
             SELECT coalesce(max(number), 0) FROM (
                 SELECT greatest(substring(default_code from %(pattern)s)::numeric,
@@ -76,16 +111,24 @@ class BiotexProductSequence(models.Model):
                 SELECT l.consecutive FROM biotex_classification_session_line l
                   JOIN biotex_classification_session s ON s.id = l.session_id
                   WHERE s.class_code = %(prefix)s
+                    AND (NOT %(reset)s OR l.id > %(line_id)s OR s.state = 'draft')
                 UNION ALL
                 SELECT substring(code from %(pattern)s)::numeric
                   FROM biotex_classification_session_line l
-                  CROSS JOIN LATERAL unnest(ARRAY[l.reference, l.old_reference,
-                    l.applied_reference_before, l.applied_reference_after]) AS codes(code)
+                  JOIN biotex_classification_session s ON s.id = l.session_id
+                  CROSS JOIN LATERAL unnest(CASE WHEN %(reset)s
+                    THEN ARRAY[l.reference, l.applied_reference_after]
+                    ELSE ARRAY[l.reference, l.old_reference,
+                      l.applied_reference_before, l.applied_reference_after] END) AS codes(code)
                   WHERE code ~ %(pattern)s
+                    AND (NOT %(reset)s OR l.id > %(line_id)s OR s.state = 'draft')
                 UNION ALL
                 SELECT consecutive FROM biotex_product_code_history WHERE prefix = %(prefix)s
+                    AND (NOT %(reset)s OR id > %(history_id)s)
             ) observed
-        ''', {'pattern': pattern, 'prefix': prefix})
+        ''', {'pattern': pattern, 'prefix': prefix, 'reset': bool(boundary),
+              'line_id': boundary['line_id'] if boundary else 0,
+              'history_id': boundary['history_id'] if boundary else 0})
         return int(self.env.cr.fetchone()[0])
 
     @api.model

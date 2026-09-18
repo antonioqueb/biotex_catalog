@@ -1,3 +1,5 @@
+import json
+
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 from odoo.tests.common import new_test_user
@@ -176,3 +178,82 @@ class TestProductSequence(TransactionCase):
         session = self.session()
         session.workspace_add_products(self.product().ids)
         self.assertEqual(session.line_ids.consecutive, 32)
+
+    def authorize_reset(self, last_number=1):
+        """Fixture equivalent of the locked, audited operator-only reset."""
+        History = self.env['biotex.product.code.history'].sudo()
+        Line = self.env['biotex.classification.session.line'].sudo()
+        self.env['ir.config_parameter'].sudo().set_param(
+            'biotex_catalog.sequence_reset_boundary.' + self.prefix,
+            json.dumps({'history_id': max(History.search([]).ids, default=0),
+                        'line_id': max(Line.search([]).ids, default=0)}))
+        self.counter._advance(self.prefix, last_number)
+        self.counter.sudo().search([('prefix', '=', self.prefix)]).write({'last_number': last_number})
+
+    def test_authorized_reset_applies_02_and_03_without_deleting_old_history(self):
+        valid = self.product(default_code=self.prefix + '-01', biotex_consecutive=1)
+        retired = self.product(default_code=self.prefix + '-02', biotex_consecutive=2)
+        retired.write({'default_code': 'RETIRED-RESET', 'biotex_consecutive': 0})
+        old_session = self.session()
+        old_product = self.product(biotex_reference='RESET-OLD-MANUFACTURER')
+        old_session.workspace_add_products(old_product.ids)
+        self.assertEqual(old_session.line_ids.consecutive, 3)
+        preview = old_session.workspace_confirmation_preview()
+        old_session.workspace_confirm(expected_revision=preview['revision'])
+        old_product.write({'default_code': 'RETIRED-RESET-THREE', 'biotex_consecutive': 0})
+        History = self.env['biotex.product.code.history'].sudo()
+        history_before = History.search([('prefix', '=', self.prefix)]).read(['code', 'consecutive', 'product_tmpl_id'])
+        audit_before = old_session.line_ids.read(['consecutive', 'applied_reference_after', 'applied_reference_before'])
+        self.authorize_reset()
+        self.assertEqual(self.counter._next(self.prefix), 2)
+        for number in (2, 3):
+            session = self.session()
+            product = self.product(biotex_reference='RESET-NEW-MANUFACTURER-%s' % number)
+            session.workspace_add_products(product.ids)
+            self.assertEqual(session.line_ids.consecutive, number)
+            preview = session.workspace_confirmation_preview()
+            session.workspace_confirm(expected_revision=preview['revision'])
+            self.assertEqual(product.default_code, self.prefix + '-%02d' % number)
+        self.assertEqual(valid.default_code, self.prefix + '-01')
+        self.assertEqual(History.search([('prefix', '=', self.prefix)]).read(['code', 'consecutive', 'product_tmpl_id']), history_before)
+        self.assertEqual(old_session.line_ids.read(['consecutive', 'applied_reference_after', 'applied_reference_before']), audit_before)
+        self.assertEqual(self.counter._next(self.prefix), 4)
+
+    def test_reset_still_protects_archived_current_codes(self):
+        self.product(default_code=self.prefix + '-09', active=False)
+        self.authorize_reset()
+        self.assertEqual(self.counter._next(self.prefix), 10)
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            self.product(default_code=self.prefix + '-09')
+
+    def test_reset_still_protects_old_active_drafts(self):
+        session = self.session()
+        self.counter._advance(self.prefix, 8)
+        session.workspace_add_products(self.product().ids)
+        self.authorize_reset()
+        self.assertEqual(self.counter._next(self.prefix), 10)
+
+    def test_reset_still_protects_history_created_after_boundary(self):
+        self.authorize_reset()
+        retired = self.product(default_code=self.prefix + '-09')
+        retired.write({'default_code': 'RETIRED-AFTER-RESET', 'biotex_consecutive': 0})
+        self.counter.sudo().search([('prefix', '=', self.prefix)]).write({'last_number': 1})
+        self.assertEqual(self.counter._next(self.prefix), 10)
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            self.product(default_code=self.prefix + '-09')
+
+    def test_reset_does_not_reimport_old_reference_from_new_line(self):
+        self.authorize_reset()
+        session = self.session()
+        product = self.product()
+        line = self.env['biotex.classification.session.line'].create({
+            'session_id': session.id, 'product_id': product.id,
+            'old_reference': self.prefix + '-99'})
+        self.assertEqual(line.consecutive, 2)
+        self.assertEqual(self.counter._next(self.prefix), 3)
+
+    def test_malformed_reset_configuration_fails_closed(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'biotex_catalog.sequence_reset_boundary.' + self.prefix, '{"history_id": -1}')
+        with self.assertRaises(UserError):
+            self.counter._next(self.prefix)
