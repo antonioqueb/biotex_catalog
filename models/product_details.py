@@ -358,13 +358,6 @@ class ProductVariantDetails(models.Model):
                     p.product_tmpl_id._biotex_keep_barcode(old_barcode)
         return result
 
-    def _check_biotex_unique_code(self):
-        super()._check_biotex_unique_code()
-        for p in self:
-            if p.default_code and self.env['biotex.product.code.history'].sudo().search_count([
-                ('code','=',p.default_code),('product_tmpl_id','!=',p.product_tmpl_id.id)],limit=1):
-                raise ValidationError('Esa clave pertenece al historial de otro producto y no puede reutilizarse.')
-
     @api.model
     def _search_display_name(self, operator, value):
         domain=super()._search_display_name(operator,value)

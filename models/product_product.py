@@ -29,6 +29,12 @@ class ProductProduct(models.Model):
                 ('default_code', '=', product.default_code), ('id', '!=', product.id),
             ], limit=1):
                 raise ValidationError('La clave %s ya está utilizada por otro producto. Genere una clave nueva.' % product.default_code)
+            parts = counter._split_code(product.default_code)
+            history_domain = counter._history_after_reset_domain(parts[0]) if parts else []
+            if product.default_code and self.env['biotex.product.code.history'].sudo().search_count([
+                ('code', '=', product.default_code), ('product_tmpl_id', '!=', product.product_tmpl_id.id),
+            ] + history_domain, limit=1):
+                raise ValidationError('Esa clave pertenece al historial de otro producto y no puede reutilizarse.')
 
     @api.model
     def _search_display_name(self, operator, value):

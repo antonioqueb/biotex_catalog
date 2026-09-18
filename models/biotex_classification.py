@@ -176,7 +176,7 @@ class BiotexClassificationSession(models.Model):
             collision = not line.consecutive or Line.search_count([
                 ('session_id.class_code', '=', self.class_code), ('consecutive', '=', line.consecutive),
                 ('id', '!=', line.id),
-            ], limit=1) or Product.search_count([
+            ] + self.env['biotex.product.sequence']._reservation_after_reset_domain(self.class_code), limit=1) or Product.search_count([
                 ('default_code', '=', line.reference), ('product_tmpl_id', '!=', line.product_id.id),
             ], limit=1)
             if collision:
