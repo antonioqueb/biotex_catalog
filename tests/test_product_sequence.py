@@ -224,7 +224,7 @@ class TestProductSequence(TransactionCase):
         self.authorize_reset()
         self.assertEqual(self.counter._next(self.prefix), 10)
         with self.assertRaises(ValidationError), self.cr.savepoint():
-            self.product(default_code=self.prefix + '-09')
+            self.product().write({'default_code': self.prefix + '-09'})
 
     def test_reset_still_protects_old_active_drafts(self):
         session = self.session()
@@ -240,7 +240,7 @@ class TestProductSequence(TransactionCase):
         self.counter.sudo().search([('prefix', '=', self.prefix)]).write({'last_number': 1})
         self.assertEqual(self.counter._next(self.prefix), 10)
         with self.assertRaises(ValidationError), self.cr.savepoint():
-            self.product(default_code=self.prefix + '-09')
+            self.product().write({'default_code': self.prefix + '-09'})
 
     def test_reset_does_not_reimport_old_reference_from_new_line(self):
         self.authorize_reset()

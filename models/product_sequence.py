@@ -90,7 +90,7 @@ class BiotexProductSequence(models.Model):
         self.env['product.template'].flush_model(['default_code', 'biotex_consecutive'])
         self.env['product.product'].flush_model(['default_code'])
         self.env['biotex.generic'].flush_model(['code', 'consecutive'])
-        self.env['biotex.classification.session'].flush_model(['class_code'])
+        self.env['biotex.classification.session'].flush_model(['class_code', 'state'])
         self.env['biotex.classification.session.line'].flush_model([
             'consecutive', 'reference', 'old_reference', 'applied_reference_before', 'applied_reference_after'])
         self.env['biotex.product.code.history'].flush_model(['prefix','consecutive'])
@@ -137,6 +137,7 @@ class BiotexProductSequence(models.Model):
         floor = int(floor)
         if floor < 0 or floor + int(reserve) > 2147483647:
             raise UserError('El consecutivo de esta clasificación excede el rango disponible.')
+        self.flush_model(['prefix', 'last_number'])
         # ON CONFLICT also serializes creation of a previously unseen prefix.
         # Under Odoo's repeatable-read isolation a competing stale transaction
         # receives SerializationFailure, which the RPC layer retries in full.
@@ -159,6 +160,7 @@ class BiotexProductSequence(models.Model):
         floor = self._observed_max(prefix)
         if reserve:
             return self._advance(prefix, floor, reserve=True)
+        self.flush_model(['last_number'])
         self.env.cr.execute('SELECT last_number FROM biotex_product_sequence WHERE prefix = %s', (prefix,))
         row = self.env.cr.fetchone()
         return max(floor, row[0] if row else 0) + 1
